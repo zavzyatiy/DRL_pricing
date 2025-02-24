@@ -15,7 +15,12 @@ torch.manual_seed(42)
 ### инициализация гиперпараметров: n, m, \delta, \gamma,
 ### c_i, h^+, v^-, \eta
 
+### количество итераций внутри среды
 T = 100
+
+### количество симуляций среды
+ENV = 1
+
 n = 2
 m = 5
 delta = 0.6
@@ -33,8 +38,10 @@ eta = 0.05
 
 ### Инициализация основного цикла
 
-for t in range(T):
+for env in range(ENV):
+    for t in range(T):
 
-    ### взаимодействие
+        ### взаимодействие
+        print(rnd.randint(1, 10))
 
-    continue
+        continue
