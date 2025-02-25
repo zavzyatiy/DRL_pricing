@@ -48,15 +48,18 @@ if mode == "D":
 else:
     prices = (p_inf, p_sup)
 
-ex = epsilon_greedy(0.5, [], [])
-ex.hello()
+eps = 0.8
+# ex = epsilon_greedy(0.5, [], [])
+# ex.hello()
 
 ### ПОКА ВСЕ НАПИСАНО ДЛЯ "D"
 for env in range(ENV):
 
-    ### Инициализация памяти фирм
+    ### Инициализация алгоритмов фирм
     # FirmMemory = ... 
-    Q = np.zeros((n, len(prices)))
+    firm1 = epsilon_greedy(eps,
+                           np.random.normal(0, 1, size=arms_amo + 1),
+                           prices)
 
     ### Инициализация памяти платформы
 

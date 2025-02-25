@@ -18,6 +18,8 @@ class epsilon_greedy:
             action_list: list,            
 			):
 
+        assert len(Q_list) == len(action_list), "Length doesn't match!"
+
         self.eps = eps
         self.Q_list = Q_list
         self.action_list = action_list
@@ -26,7 +28,7 @@ class epsilon_greedy:
         print("OK!", self.eps)
     
 
-ex = epsilon_greedy(0.5, [], [])
+# ex = epsilon_greedy(0.5, [], [])
 
 # # Total number of bandit problems
 # banditProblems = 20
