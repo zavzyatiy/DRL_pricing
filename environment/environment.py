@@ -5,6 +5,7 @@
 import random as rnd
 import numpy as np
 import torch
+from firms.firms import epsilon_greedy
 
 ### иницализация randomseed
 
@@ -29,24 +30,35 @@ c_i = 1             # издержки закупки товара
 h_plus = 0          # издержки хранения остатков
 v_minus = 0         # издержки экстренного дозаполнения
 eta = 0.05          # вероятность оставить отзыв
-p_inf = c_i         
-p_sup = 10
+p_inf = c_i         # нижняя граница цены == MC
+p_sup = 10          # верхняя граница цены == адеватность/монополия
+arms_amo = 100      # количество цен для перебора при дискретизации
+                    # пространства возможных цен
+mode = "D"          # режим: D - дискр., C - непр.
 
+if mode == "D":
+    prices = np.linspace(p_inf, p_sup, arms_amo + 1)
+else:
+    prices = (p_inf, p_sup)
+
+ex = epsilon_greedy(0.5, [], [])
+ex.hello()
+
+### ПОКА ВСЕ НАПИСАНО ДЛЯ "D"
 for env in range(ENV):
 
     ### Инициализация памяти фирм
     # FirmMemory = ... 
-    Q = np.zeros((n,k))
+    Q = np.zeros((n, len(prices)))
 
     ### Инициализация памяти платформы
 
     ### Инициализация памяти в отзывах
 
     ### Инициализация основного цикла
-
     for t in range(T):
 
         ### взаимодействие
-        print(rnd.randint(1, 10))
+        
 
         continue
