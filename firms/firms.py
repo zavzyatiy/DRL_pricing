@@ -9,23 +9,53 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 
+random.seed(42)
+# torch.manual_seed(42)
+
 class epsilon_greedy:
      
     def __init__(
             self,
             eps: float,
             Q_list: list,
-            action_list: list,            
+            action_list: list,
+            alpha = 0.5,
+            mode = None,
 			):
 
+        mode_list = ["sanchez_cartas", "zhou"]
         assert len(Q_list) == len(action_list), "Length doesn't match!"
+        assert type(mode) == type(None) or mode in mode_list, f"Search mode must be in [None {' '.join(mode_list)}]"
 
         self.eps = eps
         self.Q_list = Q_list
         self.action_list = action_list
-            
-    def hello(self):
-        print("OK!", self.eps)
+        self.alpha = alpha
+        self.mode = mode
+        if mode:
+            self.t = 0
+            self.beta = 1.5/(10**4)
+        else:
+            self.t = None
+            self.beta = None
+    
+    def suggest(self):
+        if self.mode == "sanchez_cartas":
+            self.eps = 1 - np.exp(-self.beta*self.t)
+            self.t += 1
+        if np.random.random() >= self.eps:
+            idx = np.random.randint(len(self.action_list))
+            return self.action_list[idx]
+        else:
+            idx = np.argmax(self.Q_list)
+            return self.action_list[idx]
+
+    def update(self, action, response):
+        # idx = self.action_list.index(action)
+        idx = np.where(self.action_list == action)
+        Q_list = self.Q_list
+        Q_list[idx] = self.alpha * Q_list[idx] + (1 - self.alpha) * response
+        self.Q_list = Q_list
     
 
 # ex = epsilon_greedy(0.5, [], [])
