@@ -19,12 +19,12 @@ armPulls=200
 # True means generated for each arms for all the bandits
 trueMeans=np.random.normal(0, 1, (banditProblems, k))
 # Storing the true optimal arms in each bandit
-trueOptimal=np.argmax(trueMeans,1)
+trueOptimal=np.argmax(trueMeans, 1)
 # Each row represents a bandit problem
 
 # Array of values for epsilon
 epsilon = [0, 0.1]
-col = ['r','g']
+col = ['r', 'g']
 
 # Adding subplots to plot and compare both plots simultaneously
 plotFirst=plt.figure().add_subplot(111)
@@ -32,7 +32,7 @@ plotSecond=plt.figure().add_subplot(111)
 
 for x in range(len(epsilon)) :
 
-	print('The present epsilon value is : ',x)
+	print('The present epsilon value is : ', x)
 
 	# Storing the predicted reward
 	Q = np.zeros((banditProblems,k))
@@ -55,7 +55,7 @@ for x in range(len(epsilon)) :
 
 			if random.random() < epsilon[x] :
 				i=np.random.randint(k)
-			else :
+			else:
 				i=np.argmax(Q[z])
 			
 			# To calculate % optimal action
@@ -64,7 +64,7 @@ for x in range(len(epsilon)) :
 
 			rewardTemp = np.random.normal(trueMeans[z][i], 1)
 			rewardPull.append(rewardTemp)
-			N[z][i] = N[z][i]+1
+			N[z][i] = N[z][i] + 1
 			Q[z][i] = Q[z][i] + (rewardTemp - Q[z][i])/N[z][i]
 
 		rewardAvgPull = np.mean(rewardPull)
