@@ -103,11 +103,12 @@ class TQL:
         self.delta = delta
         self.mode = mode
 
+        self.previous_memory = None
+        self.t = -len(index_list[0])
+
         if mode == "sanchez_cartas":
-            self.t = -len(index_list[0])
             self.beta = 1.5/(10**4)
         elif mode == "zhou":
-            self.t = -len(index_list[0])
             self.eps_min = 0.01
             self.eps_max = 1
             self.beta = 1.5/(10**4)
@@ -115,9 +116,13 @@ class TQL:
     def __repr__(self):
         return "TQL"
 
-    def suggest(self):
-
-
+    def suggest(self, memory):
+        if type(self.t) != type(None) and self.t < 0:
+            idx = np.random.randint(len(self.action_list))
+            self.t += 1
+            return idx
+        
+        self.previous_memory = tuple(memory)
 
         if self.mode == "sanchez_cartas":
             self.eps = np.exp(-self.beta*self.t)
@@ -126,7 +131,7 @@ class TQL:
             self.eps = self.eps_min + (self.eps_max - self.eps_min) * np.exp(-self.beta*self.t)
             self.t += 1
         
-        best = np.argmax(self.Q_list)
+        best = np.argmax(self.Q_mat[tuple(memory)])
         if np.random.random() < self.eps:
             idx = np.random.randint(len(self.action_list))
             while idx == best:
@@ -135,16 +140,21 @@ class TQL:
         else:
             return best
 
-    def update(self, idx, response):
-        Q_list = self.Q_list
-        
-        if self.mode:
-            Q_list[idx] = ((self.memory[idx] - 1) * Q_list[idx] + response)/self.memory[idx]
-        else:
-            if self.memory[idx] == 1:
-                Q_list[idx] = response
-            else:
-                Q_list[idx] = self.alpha * Q_list[idx] + (1 - self.alpha) * response
-        
-        self.Q_list = Q_list
+    def update(self, idx, memory, response):
+        if self.t == 0:
+            self.Q_mat[tuple(memory)][idx] = response
 
+        elif self.t > 0:
+            Q = self.Q_mat
+            mm = self.previous_memory
+            Q[tuple(memory)][idx] = (1 - self.alpha) * Q[tuple(memory)][idx] + self.alpha * (response + self.delta * Q[mm][idx])
+            self.Q_mat = Q
+
+        
+
+# print(TQL(0.5,
+#     np.zeros((2, 3)),
+#     [tuple([0, 0])]*3,
+#     [1, 2, 3],
+#     0.95,
+#     mode = "sanchez_cartas").t)

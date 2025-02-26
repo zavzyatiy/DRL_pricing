@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from itertools import product
 
 import sys
 import os
@@ -53,7 +54,7 @@ p_inf = c_i
 p_sup = 2
 # количество цен для перебора при дискретизации
 # пространства возможных цен
-arms_amo = 101
+arms_amo = 21
 # режим: D - дискр., C - непр.
 mode = "D"
 
@@ -67,6 +68,7 @@ eps = 0.6
 a = 2
 mu = 0.25
 alpha = 0.15
+MEMORY_VOLUME = 2
 
 history1 = []
 history2 = []
@@ -129,28 +131,34 @@ for env in range(ENV):
     #                        mode= "zhou",
     #                        )
 
-    # continue
+    index_list = list(product(range(len(prices)), repeat=MEMORY_VOLUME))
 
-    # grid_x, grid_y = np.meshgrid(prices, prices, indexing='ij')
-    # index_list = list(zip(grid_x.ravel(), grid_y.ravel()))
-    index_list = [tuple([x]) for x in prices]
+    firms_memory = len(index_list[0])
+    history = []
 
     firm1 = TQL(
         eps,
-        np.zeros((len(prices), len(index_list))),
+        np.zeros((len(index_list), len(prices))),
         index_list,
         prices,
         delta,
+        mode= "sanchez_cartas",
+        # mode = "zhou",
     )
 
     firm2 = TQL(
         eps,
-        np.zeros((len(prices), len(index_list))),
+        np.zeros((len(index_list), len(prices))),
         index_list,
         prices,
         delta,
+        mode= "sanchez_cartas",
+        # mode = "zhou",
     )
 
+    mem1 = []
+    mem2 = []
+    
     ### Инициализация памяти платформы
     # -
     
@@ -162,7 +170,6 @@ for env in range(ENV):
         for t in tqdm(range(T)):
 
             ### действие
-
             idx1 = firm1.suggest()
             idx2 = firm2.suggest()
             p1 = prices[idx1]
@@ -186,27 +193,31 @@ for env in range(ENV):
             history2.append(p2)
     
     elif str(firm1) == "TQL" and str(firm2) == "TQL":
-        for t in tqdm(range(T)):
+        for t in tqdm(range(T + MEMORY_VOLUME)):
+            
+            idx1 = firm1.suggest(mem1)
+            idx2 = firm2.suggest(mem2)
 
-            idx1 = firm1.suggest()
-            idx2 = firm2.suggest()
+            if firm1.t < 0:
+                mem1.append(idx2)
+                mem2.append(idx1)
+            else:
+                mem1 = mem1[1:] + [idx2]
+                mem2 = mem2[1:] + [idx1]
+            
             p1 = prices[idx1]
             p2 = prices[idx2]
 
-            ### подсчет спроса
             doli = spros.distribution([p1, p2])
 
-            ### подсчет прибыли фирм
             pi_1 = (p1 - c_i) * doli[0]
             pi_2 = (p2 - c_i) * doli[1]
 
+            firm1.update(idx1, mem1, pi_1)
+            firm2.update(idx2, mem2, pi_2)
+
             History1.append(pi_1)
             History2.append(pi_2)
-
-            ### обновление весов алгоритмов
-            firm1.update(idx1, pi_1)
-            firm2.update(idx2, pi_2)
-
             history1.append(p1)
             history2.append(p2)
         
@@ -219,26 +230,23 @@ for env in range(ENV):
 # plt.plot(History2)
 # plt.show()
 
-# window_size = int(T/20)
-# kernel = np.ones(window_size) / window_size
-# mv1 = np.convolve(history1, kernel, mode='valid')
-# mv2 = np.convolve(history2, kernel, mode='valid')
+window_size = int(T/20)
+kernel = np.ones(window_size) / window_size
+mv1 = np.convolve(history1, kernel, mode='valid')
+mv2 = np.convolve(history2, kernel, mode='valid')
 
-# plt.plot(mv1)
-# plt.plot(mv2)
-# plt.title("Динамика цен")
-# plt.show()
+plt.plot(mv1)
+plt.plot(mv2)
+plt.title("Динамика цен")
+plt.show()
 
-# window_size = int(T/20)
-# kernel = np.ones(window_size) / window_size
-# mv1 = np.convolve(History1, kernel, mode='valid')
-# mv2 = np.convolve(History2, kernel, mode='valid')
+window_size = int(T/20)
+kernel = np.ones(window_size) / window_size
+mv1 = np.convolve(History1, kernel, mode='valid')
+mv2 = np.convolve(History2, kernel, mode='valid')
 
-# plt.plot(mv1)
-# plt.plot(mv2)
-# plt.title("Динамика прибылей")
-# plt.show()
+plt.plot(mv1)
+plt.plot(mv2)
+plt.title("Динамика прибылей")
+plt.show()
 
-prices = np.array([1, 2, 3])
-
-print("Исходный массив:", [(tuple([x]), type(tuple([x]))) for x in prices])
