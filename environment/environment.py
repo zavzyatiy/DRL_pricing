@@ -27,10 +27,10 @@ from firms.firms import epsilon_greedy, TQL
 ### c_i, h^+, v^-, \eta
 
 ### количество итераций внутри среды
-T = 100000
+T = 200000
 
 ### количество симуляций среды
-ENV = 1
+ENV = 5
 
 # число фирм
 n = 2
@@ -41,7 +41,7 @@ delta = 0.95
 # склонность доверия рекламе
 gamma = 0.5
 # издержки закупки товара
-c_i = 0
+c_i = 1
 # издержки хранения остатков
 h_plus = 0
 # издержки экстренного дозаполнения
@@ -51,7 +51,7 @@ eta = 0.05
 # нижняя граница цены == MC
 p_inf = c_i
 # верхняя граница цены == адеватность/монополия
-p_sup = 2
+p_sup = 2.5
 # количество цен для перебора при дискретизации
 # пространства возможных цен
 arms_amo = 21
@@ -69,11 +69,6 @@ a = 2
 mu = 0.25
 alpha = 0.15
 MEMORY_VOLUME = 2
-
-history1 = []
-history2 = []
-History1 = []
-History2 = []
 
 ### Всевозможные модели спросов
 
@@ -109,9 +104,17 @@ class demand_function:
             sum_exp = sum(exp_s)
             return [x/sum_exp for x in exp_s[1:]]
 
+Price_history = []
+Profit_history = []
+
 ### ПОКА ВСЕ НАПИСАНО ДЛЯ "D"
 ### Более того, для эпсилон-жадной реализации QL без памяти
 for env in range(ENV):
+
+    raw_price_history1 = []
+    raw_price_history2 = []
+    raw_profit_history1 = []
+    raw_profit_history2 = []
 
     spros = demand_function(n, "logit", a = a, mu = mu)
 
@@ -142,8 +145,8 @@ for env in range(ENV):
         index_list,
         prices,
         delta,
-        mode= "sanchez_cartas",
-        # mode = "zhou",
+        # mode= "sanchez_cartas",
+        mode = "zhou",
     )
 
     firm2 = TQL(
@@ -152,8 +155,8 @@ for env in range(ENV):
         index_list,
         prices,
         delta,
-        mode= "sanchez_cartas",
-        # mode = "zhou",
+        # mode= "sanchez_cartas",
+        mode = "zhou",
     )
 
     mem1 = []
@@ -182,18 +185,19 @@ for env in range(ENV):
             pi_1 = (p1 - c_i) * doli[0]
             pi_2 = (p2 - c_i) * doli[1]
 
-            History1.append(pi_1)
-            History2.append(pi_2)
+            raw_profit_history1.append(pi_1)
+            raw_profit_history2.append(pi_2)
 
             ### обновление весов алгоритмов
             firm1.update(idx1, pi_1)
             firm2.update(idx2, pi_2)
 
-            history1.append(p1)
-            history2.append(p2)
+            raw_price_history1.append(p1)
+            raw_price_history2.append(p2)
     
     elif str(firm1) == "TQL" and str(firm2) == "TQL":
-        for t in tqdm(range(T + MEMORY_VOLUME)):
+        for t in tqdm(range(T + MEMORY_VOLUME), f"Раунд {env + 1}"):
+        # for t in range(T + MEMORY_VOLUME):
             
             idx1 = firm1.suggest(mem1)
             idx2 = firm2.suggest(mem2)
@@ -216,24 +220,20 @@ for env in range(ENV):
             firm1.update(idx1, mem1, pi_1)
             firm2.update(idx2, mem2, pi_2)
 
-            History1.append(pi_1)
-            History2.append(pi_2)
-            history1.append(p1)
-            history2.append(p2)
-        
+            raw_profit_history1.append(pi_1)
+            raw_profit_history2.append(pi_2)
+            raw_price_history1.append(p1)
+            raw_price_history2.append(p2)
+    
+    Price_history.append((np.mean(raw_price_history1), np.mean(raw_price_history2)))
+    Profit_history.append((np.mean(raw_profit_history1), np.mean(raw_profit_history2)))
 
-# plt.plot(history1)
-# plt.plot(history2)
-# plt.show()
 
-# plt.plot(History1)
-# plt.plot(History2)
-# plt.show()
 
 window_size = int(T/20)
 kernel = np.ones(window_size) / window_size
-mv1 = np.convolve(history1, kernel, mode='valid')
-mv2 = np.convolve(history2, kernel, mode='valid')
+mv1 = np.convolve(raw_price_history1, kernel, mode='valid')
+mv2 = np.convolve(raw_price_history2, kernel, mode='valid')
 
 plt.plot(mv1)
 plt.plot(mv2)
@@ -242,11 +242,19 @@ plt.show()
 
 window_size = int(T/20)
 kernel = np.ones(window_size) / window_size
-mv1 = np.convolve(History1, kernel, mode='valid')
-mv2 = np.convolve(History2, kernel, mode='valid')
+mv1 = np.convolve(raw_profit_history1, kernel, mode='valid')
+mv2 = np.convolve(raw_profit_history2, kernel, mode='valid')
 
 plt.plot(mv1)
 plt.plot(mv2)
 plt.title("Динамика прибылей")
 plt.show()
 
+print("Средняя цена по всем раундам:", np.mean([x[0] for x in Price_history]), np.mean([x[1] for x in Price_history]))
+print("Средняя прибыль по всем раундам:", np.mean([x[0] for x in Profit_history]), np.mean([x[1] for x in Profit_history]))
+
+"""
+Средняя цена по всем раундам: 1.63549825501745 1.6407975932740673
+Средняя прибыль по всем раундам: 0.27545766483096434 0.2725363997035166
+ENV = 100, T = 200000, mode = "zhou"
+"""
