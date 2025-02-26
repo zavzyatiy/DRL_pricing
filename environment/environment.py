@@ -14,7 +14,7 @@ import os
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(project_root)
 
-from firms.firms import epsilon_greedy
+from firms.firms import epsilon_greedy, TQL
 
 ### иницализация randomseed
 
@@ -26,7 +26,7 @@ from firms.firms import epsilon_greedy
 ### c_i, h^+, v^-, \eta
 
 ### количество итераций внутри среды
-T = 1000000
+T = 100000
 
 ### количество симуляций среды
 ENV = 1
@@ -36,7 +36,7 @@ n = 2
 # горизонт памяти платформы
 m = 5
 # коэффициент дисконтирования
-delta = 0.6
+delta = 0.95
 # склонность доверия рекламе
 gamma = 0.5
 # издержки закупки товара
@@ -50,15 +50,15 @@ eta = 0.05
 # нижняя граница цены == MC
 p_inf = c_i
 # верхняя граница цены == адеватность/монополия
-p_sup = 4
+p_sup = 2
 # количество цен для перебора при дискретизации
 # пространства возможных цен
-arms_amo = 100
+arms_amo = 101
 # режим: D - дискр., C - непр.
 mode = "D"
 
 if mode == "D":
-    prices = np.linspace(p_inf, p_sup, arms_amo + 1)
+    prices = np.linspace(p_inf, p_sup, arms_amo)
 else:
     prices = (p_inf, p_sup)
 
@@ -66,6 +66,7 @@ else:
 eps = 0.6
 a = 2
 mu = 0.25
+alpha = 0.15
 
 history1 = []
 history2 = []
@@ -117,14 +118,21 @@ for env in range(ENV):
     firm1 = epsilon_greedy(eps,
                            np.zeros(len(prices)),
                            prices,
-                        #    mode= "zhou",
+                        #    mode= "sanchez_cartas",
+                           mode= "zhou",
                            )
     
     firm2 = epsilon_greedy(eps,
                            np.zeros(len(prices)),
                            prices,
-                        #    mode= "zhou",
+                        #    mode= "sanchez_cartas"
+                           mode= "zhou",
+
                            )
+
+    # firm1 = TQL()
+
+    # firm2 = TQL()
 
     ### Инициализация памяти платформы
     # -
