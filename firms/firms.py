@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 
-random.seed(42)
+# random.seed(42)
 # torch.manual_seed(42)
 
 class epsilon_greedy:
@@ -30,108 +30,50 @@ class epsilon_greedy:
         self.eps = eps
         self.Q_list = Q_list
         self.action_list = action_list
+        self.memory = [0] * len(action_list)
         self.alpha = alpha
         self.mode = mode
-        if mode:
+
+        if mode == "sanchez_cartas":
             self.t = 0
             self.beta = 1.5/(10**4)
-        else:
-            self.t = None
-            self.beta = None
+        elif mode == "zhou":
+            self.t = 0
+            self.eps_min = 0.05
+            self.eps_max = 1
+            self.beta = 1.5/(10**4)
+
     
     def suggest(self):
         if self.mode == "sanchez_cartas":
             self.eps = 1 - np.exp(-self.beta*self.t)
             self.t += 1
-        if np.random.random() >= self.eps:
+        elif self.mode == "zhou":
+            self.eps = self.eps_min + (self.eps_max - self.eps_min) * np.exp(-self.beta*self.t)
+            self.t += 1
+        
+        best = np.argmax(self.Q_list)
+        if np.random.random() < self.eps:
             idx = np.random.randint(len(self.action_list))
-            return self.action_list[idx]
+            while idx == best:
+                idx = np.random.randint(len(self.action_list))
+            self.memory[idx] += 1
+            return idx
         else:
             idx = np.argmax(self.Q_list)
-            return self.action_list[idx]
+            self.memory[idx] += 1
+            return idx
 
-    def update(self, action, response):
-        # idx = self.action_list.index(action)
-        idx = np.where(self.action_list == action)
+    def update(self, idx, response):
         Q_list = self.Q_list
-        Q_list[idx] = self.alpha * Q_list[idx] + (1 - self.alpha) * response
+        
+        if self.mode:
+            Q_list[idx] = ((self.memory[idx] - 1) * Q_list[idx] + response)/self.memory[idx]
+        else:
+            if self.memory[idx] == 1:
+                Q_list[idx] = response
+            else:
+                Q_list[idx] = self.alpha * Q_list[idx] + (1 - self.alpha) * response
+        
         self.Q_list = Q_list
     
-
-# ex = epsilon_greedy(0.5, [], [])
-
-# # Total number of bandit problems
-# banditProblems = 20
-# # Total number of arms in each bandit problem
-# k=2
-# # Total number of times to pull each arm
-# armPulls=200
-
-# # True means generated for each arms for all the bandits
-# trueMeans=np.random.normal(0, 1, (banditProblems, k))
-# # Storing the true optimal arms in each bandit
-# trueOptimal=np.argmax(trueMeans, 1)
-# # Each row represents a bandit problem
-
-# # Array of values for epsilon
-# epsilon = [0, 0.1]
-# col = ['r', 'g']
-
-# # Adding subplots to plot and compare both plots simultaneously
-# plotFirst=plt.figure().add_subplot(111)
-# plotSecond=plt.figure().add_subplot(111)
-
-# for x in range(len(epsilon)) :
-
-# 	print('The present epsilon value is : ', x)
-
-# 	# Storing the predicted reward
-# 	Q = np.zeros((banditProblems,k))
-# 	# Total number of times each arms is pulled
-# 	N = np.ones((banditProblems,k))
-# 	# Assigning initial random arm pulls
-# 	initialArm = np.random.normal(trueMeans, 1)
-
-# 	rewardEps=[]
-# 	rewardEps.append(0)
-# 	rewardEps.append(np.mean(initialArm))
-# 	rewardEpsOptimal = []
-
-# 	for y in range(2, armPulls+1) :
-# 		# All rewards in this pull/time-step
-# 		rewardPull=[] 
-# 		# Number of pulss of best arm in this time step
-# 		optimalPull = 0 
-# 		for z in range(banditProblems) :
-
-# 			if random.random() < epsilon[x] :
-# 				i=np.random.randint(k)
-# 			else:
-# 				i=np.argmax(Q[z])
-			
-# 			# To calculate % optimal action
-# 			if i == trueOptimal[z]: 
-# 				optimalPull = optimalPull + 1
-
-# 			rewardTemp = np.random.normal(trueMeans[z][i], 1)
-# 			rewardPull.append(rewardTemp)
-# 			N[z][i] = N[z][i] + 1
-# 			Q[z][i] = Q[z][i] + (rewardTemp - Q[z][i])/N[z][i]
-
-# 		rewardAvgPull = np.mean(rewardPull)
-# 		rewardEps.append(rewardAvgPull)
-# 		rewardEpsOptimal.append(float(optimalPull)*100/banditProblems)
-# 	plotFirst.plot(range(0, armPulls + 1), rewardEps, col[x])
-# 	plotSecond.plot(range(2, armPulls + 1), rewardEpsOptimal, col[x])
-
-# #plt.ylim(0.5,1.5)
-# plotFirst.title.set_text('epsilon-greedy : Average Reward Vs Steps for 10 arms')
-# plotFirst.set_ylabel('Average Reward')
-# plotFirst.set_xlabel('Steps')
-# plotFirst.legend(("\epsilon="+str(epsilon[0]),"\epsilon="+str(epsilon[1])),loc='best')
-# plotSecond.title.set_text('\epsilon-greedy : \% Optimal Action Vs Steps for 10 arms')
-# plotSecond.set_ylabel('\% Optimal Action')
-# plotSecond.set_xlabel('Steps')
-# plotSecond.set_ylim(0,100)
-# plotSecond.legend(("\epsilon="+str(epsilon[0]),r"\epsilon="+str(epsilon[1])),loc='best')
-# plt.show()

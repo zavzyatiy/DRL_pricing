@@ -18,39 +18,54 @@ from firms.firms import epsilon_greedy
 
 ### иницализация randomseed
 
-random.seed(42)
-torch.manual_seed(42)
+# random.seed(42)
+# torch.manual_seed(42)
 
 ### начальные условия: инициализация весов для всех алгоритмов
 ### инициализация гиперпараметров: n, m, \delta, \gamma,
 ### c_i, h^+, v^-, \eta
 
 ### количество итераций внутри среды
-T = 100000
+T = 1000000
 
 ### количество симуляций среды
 ENV = 1
 
-n = 2               # число фирм
-m = 5               # горизонт памяти платформы
-delta = 0.6         # коэффициент дисконтирования
-gamma = 0.5         # склонность доверия рекламе
-c_i = 1             # издержки закупки товара
-h_plus = 0          # издержки хранения остатков
-v_minus = 0         # издержки экстренного дозаполнения
-eta = 0.05          # вероятность оставить отзыв
-p_inf = c_i         # нижняя граница цены == MC
-p_sup = 2.2     # верхняя граница цены == адеватность/монополия
-arms_amo = 100      # количество цен для перебора при дискретизации
-                    # пространства возможных цен
-mode = "D"          # режим: D - дискр., C - непр.
+# число фирм
+n = 2
+# горизонт памяти платформы
+m = 5
+# коэффициент дисконтирования
+delta = 0.6
+# склонность доверия рекламе
+gamma = 0.5
+# издержки закупки товара
+c_i = 0
+# издержки хранения остатков
+h_plus = 0
+# издержки экстренного дозаполнения
+v_minus = 0
+# вероятность оставить отзыв
+eta = 0.05
+# нижняя граница цены == MC
+p_inf = c_i
+# верхняя граница цены == адеватность/монополия
+p_sup = 4
+# количество цен для перебора при дискретизации
+# пространства возможных цен
+arms_amo = 100
+# режим: D - дискр., C - непр.
+mode = "D"
 
 if mode == "D":
     prices = np.linspace(p_inf, p_sup, arms_amo + 1)
 else:
     prices = (p_inf, p_sup)
 
+### параметры для тестирования
 eps = 0.6
+a = 2
+mu = 0.25
 
 history1 = []
 history2 = []
@@ -64,7 +79,9 @@ class demand_function:
     def __init__(
             self,
             n: int,
-            mode: str,           
+            mode: str,
+            a: None,
+            mu: None,          
 			):
 
         mode_list = ["logit"]
@@ -72,11 +89,20 @@ class demand_function:
         assert mode in mode_list, f"Demand function must be in [{' '.join(mode_list)}]"
         self.n = n
         self.mode = mode
+        if a and mu:
+            self.a = a
+            self.mu = mu
+        else:
+            self.a = None
+            self.mu = None
     
     def distribution(self, prices):
         if self.mode == "logit":
-            s = [0] + list(prices)
-            exp_s = [np.exp(-x) for x in s]
+            s = list(prices)
+            if self.a:
+                exp_s = [1] + [np.exp((self.a - x)/self.mu) for x in s]
+            else:
+                exp_s = [1] + [np.exp(-x) for x in s]
             sum_exp = sum(exp_s)
             return [x/sum_exp for x in exp_s[1:]]
 
@@ -84,20 +110,20 @@ class demand_function:
 ### Более того, для эпсилон-жадной реализации QL без памяти
 for env in range(ENV):
 
-    spros = demand_function(n, "logit")
+    spros = demand_function(n, "logit", a = a, mu = mu)
 
     ### Инициализация алгоритмов фирм
     # FirmMemory = ... 
     firm1 = epsilon_greedy(eps,
                            np.zeros(len(prices)),
                            prices,
-                           mode = "sanchez_cartas",
+                        #    mode= "zhou",
                            )
     
     firm2 = epsilon_greedy(eps,
                            np.zeros(len(prices)),
                            prices,
-                           mode = "sanchez_cartas",
+                        #    mode= "zhou",
                            )
 
     ### Инициализация памяти платформы
@@ -110,8 +136,10 @@ for env in range(ENV):
     for t in tqdm(range(T)):
 
         ### действие
-        p1 = firm1.suggest()
-        p2 = firm2.suggest()
+        idx1 = firm1.suggest()
+        idx2 = firm2.suggest()
+        p1 = prices[idx1]
+        p2 = prices[idx2]
 
         ### подсчет спроса
         doli = spros.distribution([p1, p2])
@@ -124,8 +152,8 @@ for env in range(ENV):
         History2.append(pi_2)
 
         ### обновление весов алгоритмов
-        firm1.update(p1, pi_1)
-        firm2.update(p2, pi_2)
+        firm1.update(idx1, pi_1)
+        firm2.update(idx2, pi_2)
 
         history1.append(p1)
         history2.append(p2)
@@ -138,7 +166,7 @@ for env in range(ENV):
 # plt.plot(History2)
 # plt.show()
 
-window_size = 100
+window_size = int(T/20)
 kernel = np.ones(window_size) / window_size
 mv1 = np.convolve(history1, kernel, mode='valid')
 mv2 = np.convolve(history2, kernel, mode='valid')
@@ -147,7 +175,7 @@ plt.plot(mv1)
 plt.plot(mv2)
 plt.show()
 
-window_size = 100
+window_size = int(T/20)
 kernel = np.ones(window_size) / window_size
 mv1 = np.convolve(History1, kernel, mode='valid')
 mv2 = np.convolve(History2, kernel, mode='valid')
