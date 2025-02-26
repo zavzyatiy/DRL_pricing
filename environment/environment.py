@@ -115,24 +115,41 @@ for env in range(ENV):
 
     ### Инициализация алгоритмов фирм
     # FirmMemory = ... 
-    firm1 = epsilon_greedy(eps,
-                           np.zeros(len(prices)),
-                           prices,
-                        #    mode= "sanchez_cartas",
-                           mode= "zhou",
-                           )
+    # firm1 = epsilon_greedy(eps,
+    #                        np.zeros(len(prices)),
+    #                        prices,
+    #                     #    mode= "sanchez_cartas",
+    #                        mode= "zhou",
+    #                        )
     
-    firm2 = epsilon_greedy(eps,
-                           np.zeros(len(prices)),
-                           prices,
-                        #    mode= "sanchez_cartas"
-                           mode= "zhou",
+    # firm2 = epsilon_greedy(eps,
+    #                        np.zeros(len(prices)),
+    #                        prices,
+    #                     #    mode= "sanchez_cartas"
+    #                        mode= "zhou",
+    #                        )
 
-                           )
+    # continue
 
-    # firm1 = TQL()
+    # grid_x, grid_y = np.meshgrid(prices, prices, indexing='ij')
+    # index_list = list(zip(grid_x.ravel(), grid_y.ravel()))
+    index_list = [tuple([x]) for x in prices]
 
-    # firm2 = TQL()
+    firm1 = TQL(
+        eps,
+        np.zeros((len(prices), len(index_list))),
+        index_list,
+        prices,
+        delta,
+    )
+
+    firm2 = TQL(
+        eps,
+        np.zeros((len(prices), len(index_list))),
+        index_list,
+        prices,
+        delta,
+    )
 
     ### Инициализация памяти платформы
     # -
@@ -141,30 +158,58 @@ for env in range(ENV):
     # -
 
     ### Инициализация основного цикла
-    for t in tqdm(range(T)):
+    if str(firm1) == "epsilon_greedy" and str(firm2) == "epsilon_greedy":
+        for t in tqdm(range(T)):
 
-        ### действие
-        idx1 = firm1.suggest()
-        idx2 = firm2.suggest()
-        p1 = prices[idx1]
-        p2 = prices[idx2]
+            ### действие
 
-        ### подсчет спроса
-        doli = spros.distribution([p1, p2])
+            idx1 = firm1.suggest()
+            idx2 = firm2.suggest()
+            p1 = prices[idx1]
+            p2 = prices[idx2]
 
-        ### подсчет прибыли фирм
-        pi_1 = (p1 - c_i) * doli[0]
-        pi_2 = (p2 - c_i) * doli[1]
+            ### подсчет спроса
+            doli = spros.distribution([p1, p2])
 
-        History1.append(pi_1)
-        History2.append(pi_2)
+            ### подсчет прибыли фирм
+            pi_1 = (p1 - c_i) * doli[0]
+            pi_2 = (p2 - c_i) * doli[1]
 
-        ### обновление весов алгоритмов
-        firm1.update(idx1, pi_1)
-        firm2.update(idx2, pi_2)
+            History1.append(pi_1)
+            History2.append(pi_2)
 
-        history1.append(p1)
-        history2.append(p2)
+            ### обновление весов алгоритмов
+            firm1.update(idx1, pi_1)
+            firm2.update(idx2, pi_2)
+
+            history1.append(p1)
+            history2.append(p2)
+    
+    elif str(firm1) == "TQL" and str(firm2) == "TQL":
+        for t in tqdm(range(T)):
+
+            idx1 = firm1.suggest()
+            idx2 = firm2.suggest()
+            p1 = prices[idx1]
+            p2 = prices[idx2]
+
+            ### подсчет спроса
+            doli = spros.distribution([p1, p2])
+
+            ### подсчет прибыли фирм
+            pi_1 = (p1 - c_i) * doli[0]
+            pi_2 = (p2 - c_i) * doli[1]
+
+            History1.append(pi_1)
+            History2.append(pi_2)
+
+            ### обновление весов алгоритмов
+            firm1.update(idx1, pi_1)
+            firm2.update(idx2, pi_2)
+
+            history1.append(p1)
+            history2.append(p2)
+        
 
 # plt.plot(history1)
 # plt.plot(history2)
@@ -174,20 +219,26 @@ for env in range(ENV):
 # plt.plot(History2)
 # plt.show()
 
-window_size = int(T/20)
-kernel = np.ones(window_size) / window_size
-mv1 = np.convolve(history1, kernel, mode='valid')
-mv2 = np.convolve(history2, kernel, mode='valid')
+# window_size = int(T/20)
+# kernel = np.ones(window_size) / window_size
+# mv1 = np.convolve(history1, kernel, mode='valid')
+# mv2 = np.convolve(history2, kernel, mode='valid')
 
-plt.plot(mv1)
-plt.plot(mv2)
-plt.show()
+# plt.plot(mv1)
+# plt.plot(mv2)
+# plt.title("Динамика цен")
+# plt.show()
 
-window_size = int(T/20)
-kernel = np.ones(window_size) / window_size
-mv1 = np.convolve(History1, kernel, mode='valid')
-mv2 = np.convolve(History2, kernel, mode='valid')
+# window_size = int(T/20)
+# kernel = np.ones(window_size) / window_size
+# mv1 = np.convolve(History1, kernel, mode='valid')
+# mv2 = np.convolve(History2, kernel, mode='valid')
 
-plt.plot(mv1)
-plt.plot(mv2)
-plt.show()
+# plt.plot(mv1)
+# plt.plot(mv2)
+# plt.title("Динамика прибылей")
+# plt.show()
+
+prices = np.array([1, 2, 3])
+
+print("Исходный массив:", [(tuple([x]), type(tuple([x]))) for x in prices])

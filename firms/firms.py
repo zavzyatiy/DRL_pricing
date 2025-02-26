@@ -42,7 +42,10 @@ class epsilon_greedy:
             self.eps_min = 0.05
             self.eps_max = 1
             self.beta = 1.5/(10**4)
-  
+
+    def __repr__(self):
+        return "epsilon_greedy"
+
     def suggest(self):
         if self.mode == "sanchez_cartas":
             self.eps = np.exp(-self.beta*self.t)
@@ -80,7 +83,8 @@ class TQL:
     def __init__(
             self,
             eps: float,
-            Q_list: list,
+            Q_mat: list,
+            index_list: list,
             action_list: list,
             delta: float,
             alpha = 0.5,
@@ -88,26 +92,33 @@ class TQL:
 			):
 
         mode_list = ["sanchez_cartas", "zhou"]
-        assert len(Q_list) == len(action_list), "Length doesn't match!"
+        assert Q_mat.shape[1] == len(action_list), "Length doesn't match!"
         assert type(mode) == type(None) or mode in mode_list, f"Search mode must be in [None {' '.join(mode_list)}]"
 
         self.eps = eps
-        self.Q_list = Q_list
+        self.Q_mat = Q_mat
+        self.index_list = index_list
         self.action_list = action_list
         self.alpha = alpha
         self.delta = delta
         self.mode = mode
 
         if mode == "sanchez_cartas":
-            self.t = 0
+            self.t = -len(index_list[0])
             self.beta = 1.5/(10**4)
         elif mode == "zhou":
-            self.t = 0
-            self.eps_min = 0.05
+            self.t = -len(index_list[0])
+            self.eps_min = 0.01
             self.eps_max = 1
             self.beta = 1.5/(10**4)
 
+    def __repr__(self):
+        return "TQL"
+
     def suggest(self):
+
+
+
         if self.mode == "sanchez_cartas":
             self.eps = np.exp(-self.beta*self.t)
             self.t += 1
@@ -136,4 +147,4 @@ class TQL:
                 Q_list[idx] = self.alpha * Q_list[idx] + (1 - self.alpha) * response
         
         self.Q_list = Q_list
- 
+
