@@ -52,7 +52,7 @@ class demand_function:
 e1 = {
     "T": 100000,
     "ENV": 1,
-    "n": 2,
+    "n": 3,
     "m": 5,
     "delta": 0.95,
     "gamma": 0.5,
@@ -60,6 +60,7 @@ e1 = {
     "h_plus": 0,
     "v_minus": 0,
     "eta": 0.05,
+    "color": ["#FF7F00", "#1874CD", "#548B54", "#CD2626", "#CDCD00"],
     "VISUALIZE": True,
     "SAVE": True,
 }

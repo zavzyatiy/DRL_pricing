@@ -45,6 +45,8 @@ p_sup = Environment["p_sup"]
 # дискретизации пространства возможных цен
 arms_amo = Environment["arms_amo"]
 
+# Какими цветами рисовать?
+color = Environment["color"]
 # Выводить итоговый график?
 VISUALIZE = Environment["VISUALIZE"]
 # Сохранить итоговоый график?
@@ -167,25 +169,24 @@ if VISUALIZE or SAVE:
     plotFirst = ax[0]
     plotSecond = ax[1]
 
-    window_size = int(T/20)
+    window_size = int(0.05*T)
     kernel = np.ones(window_size) / window_size
-    mv1 = np.convolve(raw_price_history[:, 0], kernel, mode='valid')
-    mv2 = np.convolve(raw_price_history[:, 1], kernel, mode='valid')
 
-    plotFirst.plot(mv1) # , linewidth= 0.2)
-    plotFirst.plot(mv2) # , linewidth= 0.2)
+    for i in range(n):
+        mv = np.convolve(raw_price_history[:, i], kernel, mode='valid') 
+        plotFirst.plot(mv, c = color[i]) # , linewidth= 0.2)
+    
     plotFirst.set_title("Динамика цен")
     plotFirst.set_ylabel(f'Сглаженная цена (скользящее среднее по {window_size})')
     plotFirst.set_xlabel('Итерация')
 
-
     window_size = int(0.05*T)
     kernel = np.ones(window_size) / window_size
-    mv1 = np.convolve(raw_profit_history[:, 0], kernel, mode='valid')
-    mv2 = np.convolve(raw_profit_history[:, 1], kernel, mode='valid')
 
-    plotSecond.plot(mv1) # , linewidth= 0.2)
-    plotSecond.plot(mv2) # , linewidth= 0.2)
+    for i in range(n):
+        mv = np.convolve(raw_profit_history[:, i], kernel, mode='valid') 
+        plotSecond.plot(mv, c = color[i]) # , linewidth= 0.2)
+    
     plotSecond.set_title("Динамика прибылей")
     plotSecond.set_ylabel(f'Сглаженная прибыль (скользящее среднее по {window_size})')
     plotSecond.set_xlabel('Итерация')
