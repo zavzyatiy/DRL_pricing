@@ -158,8 +158,6 @@ class TQL:
             lr = sum([learn[i] * L**(MV - 1 - i) for i in range(MV)])
             Q = self.Q_mat
             mm = self.previous_memory
-            if self.t == 1000000 - 1:
-                print(np.max(Q[lr]))
             Q[mm, idx] = (1 - self.alpha) * Q[mm, idx] + self.alpha * (response + self.delta * np.max(Q[lr]))
             self.Q_mat = Q
 
