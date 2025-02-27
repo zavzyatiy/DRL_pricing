@@ -8,6 +8,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
+from firms_RL import epsilon_greedy, TQL
+
 ### Всевозможные модели спросов
 class demand_function:
      
@@ -47,6 +49,57 @@ class demand_function:
 ### инициализация гиперпараметров: n, m, \delta, \gamma,
 ### c_i, h^+, v^-, \eta
 
-Environment = {
-    
+e1 = {
+    "T": 100000,
+    "ENV": 1,
+    "n": 2,
+    "m": 5,
+    "delta": 0.95,
+    "gamma": 0.5,
+    "c_i": 1,
+    "h_plus": 0,
+    "v_minus": 0,
+    "eta": 0.05,
+    "VISUALIZE": True,
+    "SAVE": True,
 }
+e2 = {
+    "p_inf": e1["c_i"],
+    "p_sup": 2.5,
+    "arms_amo": 21,
+}
+
+mode = "D"
+
+if mode == "D":
+    prices = np.linspace(e2["p_inf"], e2["p_sup"], e2["arms_amo"])
+else:
+    prices = (e2["p_inf"], e2["p_sup"])
+
+e3 = {
+    "demand_params":{
+        "n": e1["n"],
+        "mode": "logit",
+        "a": e1["c_i"] + 1,
+        "mu": 0.25,
+    },
+}
+
+MEMORY_VOLUME = 2
+
+e4 = {
+    "prices": prices,
+    "firm_model": TQL, # epsilon_greedy
+    "firm_params": {
+        "eps": 0.6,
+        "Q_mat": np.zeros((len(prices)**MEMORY_VOLUME, len(prices))),
+        "MEMORY_VOLUME": MEMORY_VOLUME,
+        "index_list": [x for x in range(len(prices)**MEMORY_VOLUME)],
+        "action_list": prices,
+        "delta": e1["delta"],
+        "alpha": 0.15,
+        "mode": "zhou", # None, "sanchez_cartas", "zhou"
+    },
+}
+
+Environment = e1 | e2 | e3 | e4

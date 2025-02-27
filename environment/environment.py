@@ -16,53 +16,43 @@ from specification import Environment, demand_function
 # torch.manual_seed(42)
 
 ### количество итераций внутри среды
-T = 100000
+T = Environment["T"]
 
 ### количество симуляций среды
-ENV = 1
+ENV = Environment["ENV"]
 
 # число фирм
-n = 2
+n = Environment["n"]
 # горизонт памяти платформы
-m = 5
+m = Environment["m"]
 # коэффициент дисконтирования
-delta = 0.95
+delta = Environment["delta"]
 # склонность доверия рекламе
-gamma = 0.5
+gamma = Environment["gamma"]
 # издержки закупки товара
-c_i = 1
+c_i = Environment["c_i"]
 # издержки хранения остатков
-h_plus = 0
+h_plus = Environment["h_plus"]
 # издержки экстренного дозаполнения
-v_minus = 0
+v_minus = Environment["v_minus"]
 # вероятность оставить отзыв
-eta = 0.05
+eta = Environment["eta"]
 # нижняя граница цены == MC
-p_inf = c_i
+p_inf = Environment["p_inf"]
 # верхняя граница цены == адеватность/монополия
-p_sup = 2.5
-# количество цен для перебора при дискретизации
-# пространства возможных цен
-arms_amo = 21
-# режим: D - дискр., C - непр.
-mode = "D"
+p_sup = Environment["p_sup"]
+# количество цен для перебора при
+# дискретизации пространства возможных цен
+arms_amo = Environment["arms_amo"]
 
-if mode == "D":
-    prices = np.linspace(p_inf, p_sup, arms_amo)
-else:
-    prices = (p_inf, p_sup)
+# Выводить итоговый график?
+VISUALIZE = Environment["VISUALIZE"]
+# Сохранить итоговоый график?
+SAVE = Environment["SAVE"]
 
-### параметры для тестирования
-eps = 0.6
-a = 2
-mu = 0.25
-alpha = 0.15
-mode = None # None, "sanchez_cartas", "zhou"
-
-MEMORY_VOLUME = 2
-VISUALIZE = True
-
-# demand_func = Environment["demand_func"]
+# Цены
+prices = Environment["prices"]
+MEMORY_VOLUME = Environment["firm_params"]["MEMORY_VOLUME"]
 
 Price_history = []
 Profit_history = []
@@ -73,31 +63,17 @@ for env in range(ENV):
     raw_price_history = []
     raw_profit_history = []
 
-    spros = demand_function(n, "logit", a = a, mu = mu)
+    demand_params = Environment["demand_params"]
+    spros = demand_function(**demand_params)
 
     ### Инициализация однородных фирм
 
-    index_list = [x for x in range(len(prices)**MEMORY_VOLUME)]
+    M = Environment["firm_model"]
+    firm_params = Environment["firm_params"]
 
-    firm1 = TQL(
-        eps,
-        np.zeros((len(index_list), len(prices))),
-        MEMORY_VOLUME,
-        index_list,
-        prices,
-        delta,
-        mode = mode,
-    )
+    firm1 = M(**firm_params)
 
-    firm2 = TQL(
-        eps,
-        np.zeros((len(index_list), len(prices))),
-        MEMORY_VOLUME,
-        index_list,
-        prices,
-        delta,
-        mode= mode,
-    )
+    firm2 = M(**firm_params)
 
     mem1 = []
     mem2 = []
@@ -125,15 +101,13 @@ for env in range(ENV):
             pi_1 = (p1 - c_i) * doli[0]
             pi_2 = (p2 - c_i) * doli[1]
 
-            raw_profit_history1.append(pi_1)
-            raw_profit_history2.append(pi_2)
+            raw_profit_history.append((pi_1, pi_2))
 
             ### обновление весов алгоритмов
             firm1.update(idx1, pi_1)
             firm2.update(idx2, pi_2)
 
-            raw_price_history1.append(p1)
-            raw_price_history2.append(p2)
+            raw_price_history.append((p1, p2))
     
     elif str(firm1) == "TQL" and str(firm2) == "TQL":
         for t in tqdm(range(T + MEMORY_VOLUME), f"Раунд {env + 1}"):
@@ -170,7 +144,7 @@ for env in range(ENV):
     Profit_history.append((np.mean(raw_profit_history[:, 0]), np.mean(raw_profit_history[:, 1])))
 
 
-if VISUALIZE:
+if VISUALIZE or SAVE:
 
     fig, ax = plt.subplots(1, 2, figsize= (15, 6))
 
@@ -182,8 +156,8 @@ if VISUALIZE:
     mv1 = np.convolve(raw_price_history[:, 0], kernel, mode='valid')
     mv2 = np.convolve(raw_price_history[:, 1], kernel, mode='valid')
 
-    plotFirst.plot(mv1, linewidth= 0.2)
-    plotFirst.plot(mv2, linewidth= 0.2)
+    plotFirst.plot(mv1) # , linewidth= 0.2)
+    plotFirst.plot(mv2) # , linewidth= 0.2)
     plotFirst.set_title("Динамика цен")
     plotFirst.set_ylabel(f'Сглаженная цена (скользящее среднее по {window_size})')
     plotFirst.set_xlabel('Итерация')
@@ -194,24 +168,27 @@ if VISUALIZE:
     mv1 = np.convolve(raw_profit_history[:, 0], kernel, mode='valid')
     mv2 = np.convolve(raw_profit_history[:, 1], kernel, mode='valid')
 
-    plotSecond.plot(mv1, linewidth= 0.2)
-    plotSecond.plot(mv2, linewidth= 0.2)
+    plotSecond.plot(mv1) # , linewidth= 0.2)
+    plotSecond.plot(mv2) # , linewidth= 0.2)
     plotSecond.set_title("Динамика прибылей")
     plotSecond.set_ylabel(f'Сглаженная прибыль (скользящее среднее по {window_size})')
     plotSecond.set_xlabel('Итерация')
 
     plot_name = ""
 
-    plt.savefig(".png", dpi = 1000)
+    if SAVE:
+        plt.savefig(".png", dpi = 1000)
 
-    Price_history = np.array(Price_history)
-    Profit_history = np.array(Profit_history)
+    if VISUALIZE:
+        plt.show()
 
-    print("Средняя цена по всем раундам:", np.mean(Price_history[:, 0]), np.mean(Price_history[:, 1]))
-    print("Средняя прибыль по всем раундам:", np.mean(Profit_history[:, 0]), np.mean(Profit_history[:, 1]))
+Price_history = np.array(Price_history)
+Profit_history = np.array(Profit_history)
+print("Средняя цена по всем раундам:", np.mean(Price_history[:, 0]), np.mean(Price_history[:, 1]))
+print("Средняя прибыль по всем раундам:", np.mean(Profit_history[:, 0]), np.mean(Profit_history[:, 1]))
 
-    """
-    Средняя цена по всем раундам: 1.63549825501745 1.6407975932740673
-    Средняя прибыль по всем раундам: 0.27545766483096434 0.2725363997035166
-    ENV = 100, T = 200000, mode = "zhou"
-    """
+"""
+Средняя цена по всем раундам: 1.63549825501745 1.6407975932740673
+Средняя прибыль по всем раундам: 0.27545766483096434 0.2725363997035166
+ENV = 100, T = 200000, mode = "zhou"
+"""

@@ -4,7 +4,6 @@
 
 ### Здесь будут нужные функции для использования в промежуточных частях кода
 
-# Imported relevant python libraries
 import numpy as np
 import matplotlib.pyplot as plt
 import random
@@ -181,8 +180,6 @@ class DQN:
 
     def update(self, idx, memory, response):
         pass
-
-
 
 
 
