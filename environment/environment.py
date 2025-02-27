@@ -71,12 +71,13 @@ for env in range(ENV):
     M = Environment["firm_model"]
     firm_params = Environment["firm_params"]
 
-    firm1 = M(**firm_params)
+    # firm1 = M(**firm_params)
 
-    firm2 = M(**firm_params)
+    # firm2 = M(**firm_params)
 
-    mem1 = []
-    mem2 = []
+    firms = [M(**firm_params) for i in range(n)]
+
+    mem = [[] for i in range(n)]
     
     ### Инициализация памяти платформы
     # -
@@ -85,57 +86,72 @@ for env in range(ENV):
     # -
 
     ### Инициализация основного цикла
-    if str(firm1) == "epsilon_greedy" and str(firm2) == "epsilon_greedy":
+    if str(firms[0]) == "epsilon_greedy":
         for t in tqdm(range(T)):
 
             ### действие
-            idx1 = firm1.suggest()
-            idx2 = firm2.suggest()
-            p1 = prices[idx1]
-            p2 = prices[idx2]
+            idx = []
+            p = []
+            for f in firms:
+                idx_i = f.suggest()
+                idx.append(idx_i)
+                p.append(prices[idx_i])
 
             ### подсчет спроса
-            doli = spros.distribution([p1, p2])
+            doli = spros.distribution(p)
 
             ### подсчет прибыли фирм
-            pi_1 = (p1 - c_i) * doli[0]
-            pi_2 = (p2 - c_i) * doli[1]
+            pi = []
+            for i in range(n):
+                pi_i = (p[i] - c_i) * doli[i]
+                pi.append(pi_i)
 
-            raw_profit_history.append((pi_1, pi_2))
+            raw_profit_history.append(pi)
 
             ### обновление весов алгоритмов
-            firm1.update(idx1, pi_1)
-            firm2.update(idx2, pi_2)
+            for i in range(n):
+                f = firms[i]
+                f.update(idx[i], pi[i])
+                firms[i] = f
 
-            raw_price_history.append((p1, p2))
+            raw_price_history.append(p)
     
-    elif str(firm1) == "TQL" and str(firm2) == "TQL":
-        for t in tqdm(range(T + MEMORY_VOLUME), f"Раунд {env + 1}"):
+    elif str(firms[0]) == "TQL":
+        for t in tqdm(range(-MEMORY_VOLUME, T), f"Раунд {env + 1}"):
         # for t in range(T + MEMORY_VOLUME):
+            idx = []
+            for i in range(n):
+                idx_i = firms[i].suggest(mem[i])
+                idx.append(idx_i)
 
-            idx1 = firm1.suggest(mem1)
-            idx2 = firm2.suggest(mem2)
-
-            if firm1.t <= 0:
-                mem1.append(idx2)
-                mem2.append(idx1)
+            if t < 0:
+                for i in range(n):
+                    mem[i].append(idx[i])
             else:
-                mem1 = mem1[1:] + [idx2]
-                mem2 = mem2[1:] + [idx1]
+                for i in range(n):
+                    x = mem[i][1:]
+                    mem[i] = x + [idx[i]]
+            
+            # print(mem)
 
-            p1 = prices[idx1]
-            p2 = prices[idx2]
+            p = []
+            for i in range(n):
+                p.append(prices[idx[i]])
 
-            doli = spros.distribution([p1, p2])
+            doli = spros.distribution(p)
 
-            pi_1 = (p1 - c_i) * doli[0]
-            pi_2 = (p2 - c_i) * doli[1]
+            pi = []
+            for i in range(n):
+                pi_i = (p[i] - c_i) * doli[i]
+                pi.append(pi_i)
 
-            firm1.update(idx1, mem1, pi_1)
-            firm2.update(idx2, mem2, pi_2)
+            for i in range(n):
+                f = firms[i]
+                f.update(idx[i], mem[i], pi[i])
+                firms[i] = f
 
-            raw_profit_history.append((pi_1, pi_2))
-            raw_price_history.append((p1, p2))
+            raw_profit_history.append(pi)
+            raw_price_history.append(p)
     
     raw_price_history = np.array(raw_price_history)
     raw_profit_history = np.array(raw_profit_history)
