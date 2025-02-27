@@ -84,6 +84,7 @@ class TQL:
             self,
             eps: float,
             Q_mat: list,
+            MEMORY_VOLUME: int,
             index_list: list,
             action_list: list,
             delta: float,
@@ -102,36 +103,41 @@ class TQL:
         self.alpha = alpha
         self.delta = delta
         self.mode = mode
+        self.MEMORY_VOLUME = MEMORY_VOLUME
 
         self.previous_memory = None
-        self.t = -len(index_list[0])
+        self.t = - MEMORY_VOLUME
 
         if mode == "sanchez_cartas":
-            self.beta = 1.5/(10**4)
+            self.beta = 1.5/(10**4)/5
         elif mode == "zhou":
             self.eps_min = 0.01
             self.eps_max = 1
-            self.beta = 1.5/(10**4)
+            self.beta = 1.5/(10**4)/5
 
     def __repr__(self):
         return "TQL"
 
     def suggest(self, memory):
-        if type(self.t) != type(None) and self.t < 0:
+        if self.t < 0:
             idx = np.random.randint(len(self.action_list))
             self.t += 1
             return idx
         
-        self.previous_memory = tuple(memory)
+        # mem = memory[0]*len(self.action_list) + memory[1]
+        MV = self.MEMORY_VOLUME
+        mem = sum([memory[i] * MV**(MV - 1 - i) for i in range(len(memory))])
+        self.previous_memory = mem
 
         if self.mode == "sanchez_cartas":
             self.eps = np.exp(-self.beta*self.t)
-            self.t += 1
         elif self.mode == "zhou":
             self.eps = self.eps_min + (self.eps_max - self.eps_min) * np.exp(-self.beta*self.t)
-            self.t += 1
         
-        best = np.argmax(self.Q_mat[tuple(memory)])
+        self.t += 1
+        
+        # print(self.Q_mat[mem])
+        best = np.argmax(self.Q_mat[mem])
         if np.random.random() < self.eps:
             idx = np.random.randint(len(self.action_list))
             while idx == best:
@@ -142,19 +148,54 @@ class TQL:
 
     def update(self, idx, memory, response):
         if self.t == 0:
-            self.Q_mat[tuple(memory)][idx] = response
-
+            MV = self.MEMORY_VOLUME
+            mem = sum([memory[i] * MV**(MV - 1 - i) for i in range(MV)])
+            self.Q_mat[mem, idx] = response
+        
         elif self.t > 0:
+            MV = self.MEMORY_VOLUME
+            mem = sum([memory[i] * MV**(MV - 1 - i) for i in range(MV)])
             Q = self.Q_mat
             mm = self.previous_memory
-            Q[tuple(memory)][idx] = (1 - self.alpha) * Q[tuple(memory)][idx] + self.alpha * (response + self.delta * Q[mm][idx])
+            Q[mem, idx] = (1 - self.alpha) * Q[mem, idx] + self.alpha * (response + self.delta * Q[mm, idx])
             self.Q_mat = Q
 
-        
 
-# print(TQL(0.5,
-#     np.zeros((2, 3)),
-#     [tuple([0, 0])]*3,
-#     [1, 2, 3],
-#     0.95,
-#     mode = "sanchez_cartas").t)
+class DQN:
+
+    def __init__(
+            self,
+			):
+
+        pass
+
+    def __repr__(self):
+        return "DQN"
+
+    def suggest(self, memory):
+        pass
+
+    def update(self, idx, memory, response):
+        pass
+
+
+
+
+
+### Архив возможных параметризаций алгоритмов для фирм:
+
+# mode = None # None, "sanchez_cartas", "zhou"
+
+# firm1 = epsilon_greedy(
+#     eps,
+#     np.zeros(len(prices)),
+#     prices,
+#     mode = mode,
+#     )
+
+# firm2 = epsilon_greedy(
+#     eps,
+#     np.zeros(len(prices)),
+#     prices,
+#     mode = mode,
+#     )
