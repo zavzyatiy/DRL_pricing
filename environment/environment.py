@@ -7,30 +7,19 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from itertools import product
 
-import sys
-import os
-
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.append(project_root)
-
-from firms.firms import epsilon_greedy, TQL
+from firms_RL import epsilon_greedy, TQL
+from specification import Environment, demand_function
 
 ### иницализация randomseed
-
 # random.seed(42)
 # torch.manual_seed(42)
 
-### начальные условия: инициализация весов для всех алгоритмов
-### инициализация гиперпараметров: n, m, \delta, \gamma,
-### c_i, h^+, v^-, \eta
-
 ### количество итераций внутри среды
-T = 10000
+T = 100000
 
 ### количество симуляций среды
-ENV = 10
+ENV = 1
 
 # число фирм
 n = 2
@@ -54,7 +43,7 @@ p_inf = c_i
 p_sup = 2.5
 # количество цен для перебора при дискретизации
 # пространства возможных цен
-arms_amo = 51
+arms_amo = 21
 # режим: D - дискр., C - непр.
 mode = "D"
 
@@ -68,50 +57,17 @@ eps = 0.6
 a = 2
 mu = 0.25
 alpha = 0.15
+mode = None # None, "sanchez_cartas", "zhou"
 
 MEMORY_VOLUME = 2
 VISUALIZE = True
 
-### Всевозможные модели спросов
-
-class demand_function:
-     
-    def __init__(
-            self,
-            n: int,
-            mode: str,
-            a: None,
-            mu: None,          
-			):
-
-        mode_list = ["logit"]
-        assert n >= 2, "Demand is built for olygopoly, so n > 2!"
-        assert mode in mode_list, f"Demand function must be in [{' '.join(mode_list)}]"
-        self.n = n
-        self.mode = mode
-        if a and mu:
-            self.a = a
-            self.mu = mu
-        else:
-            self.a = None
-            self.mu = None
-    
-    def distribution(self, prices):
-        if self.mode == "logit":
-            s = list(prices)
-            if self.a:
-                exp_s = [1] + [np.exp((self.a - x)/self.mu) for x in s]
-            else:
-                exp_s = [1] + [np.exp(-x) for x in s]
-            
-            sum_exp = sum(exp_s)
-            return [x/sum_exp for x in exp_s[1:]]
+# demand_func = Environment["demand_func"]
 
 Price_history = []
 Profit_history = []
 
 ### ПОКА ВСЕ НАПИСАНО ДЛЯ "D"
-### Более того, для эпсилон-жадной реализации QL без памяти
 for env in range(ENV):
 
     raw_price_history = []
@@ -119,12 +75,9 @@ for env in range(ENV):
 
     spros = demand_function(n, "logit", a = a, mu = mu)
 
-    ### Инициализация алгоритмов фирм
+    ### Инициализация однородных фирм
 
-    # index_list = list(product(range(len(prices)), repeat=MEMORY_VOLUME))
     index_list = [x for x in range(len(prices)**MEMORY_VOLUME)]
-
-    mode = None # None, "sanchez_cartas", "zhou"
 
     firm1 = TQL(
         eps,
@@ -229,25 +182,27 @@ if VISUALIZE:
     mv1 = np.convolve(raw_price_history[:, 0], kernel, mode='valid')
     mv2 = np.convolve(raw_price_history[:, 1], kernel, mode='valid')
 
-    plotFirst.plot(mv1)
-    plotFirst.plot(mv2)
+    plotFirst.plot(mv1, linewidth= 0.2)
+    plotFirst.plot(mv2, linewidth= 0.2)
     plotFirst.set_title("Динамика цен")
     plotFirst.set_ylabel(f'Сглаженная цена (скользящее среднее по {window_size})')
     plotFirst.set_xlabel('Итерация')
 
 
-    window_size = int(T/20)
+    window_size = int(0.05*T)
     kernel = np.ones(window_size) / window_size
     mv1 = np.convolve(raw_profit_history[:, 0], kernel, mode='valid')
     mv2 = np.convolve(raw_profit_history[:, 1], kernel, mode='valid')
 
-    plotSecond.plot(mv1)
-    plotSecond.plot(mv2)
+    plotSecond.plot(mv1, linewidth= 0.2)
+    plotSecond.plot(mv2, linewidth= 0.2)
     plotSecond.set_title("Динамика прибылей")
     plotSecond.set_ylabel(f'Сглаженная прибыль (скользящее среднее по {window_size})')
     plotSecond.set_xlabel('Итерация')
 
-    plt.show()
+    plot_name = ""
+
+    plt.savefig(".png", dpi = 1000)
 
     Price_history = np.array(Price_history)
     Profit_history = np.array(Profit_history)
