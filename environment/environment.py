@@ -53,6 +53,8 @@ color = Environment["color"]
 profit_dynamic = Environment["profit_dynamic"]
 # Выводить итоговый график?
 VISUALIZE = Environment["VISUALIZE"]
+# Выводить теоретические величины для NE и M?
+VISUALIZE_THEORY = Environment["VISUALIZE_THEORY"]
 # Сохранить итоговоый график?
 SAVE = Environment["SAVE"]
 
@@ -64,14 +66,16 @@ own = Environment["firm_params"]["own"]
 Price_history = []
 Profit_history = []
 
+demand_params = Environment["demand_params"]
+spros = demand_function(**demand_params)
+if VISUALIZE_THEORY:
+    p_NE, p_M, pi_NE, pi_M = spros.get_theory(c_i)
+
 ### ПОКА ВСЕ НАПИСАНО ДЛЯ "D"
 for env in range(ENV):
 
     raw_price_history = []
     raw_profit_history = []
-
-    demand_params = Environment["demand_params"]
-    spros = demand_function(**demand_params)
 
     ### Инициализация однородных фирм
 
@@ -178,8 +182,8 @@ for env in range(ENV):
     raw_price_history = np.array(raw_price_history)
     raw_profit_history = np.array(raw_profit_history)
 
-    Price_history.append((np.mean(raw_price_history[:, 0]), np.mean(raw_price_history[:, 1])))
-    Profit_history.append((np.mean(raw_profit_history[:, 0]), np.mean(raw_profit_history[:, 1])))
+    Price_history.append((np.mean(raw_price_history[-int(T/100):, 0]), np.mean(raw_price_history[-int(T/100):, 1])))
+    Profit_history.append((np.mean(raw_profit_history[-int(T/100):, 0]), np.mean(raw_profit_history[-int(T/100):, 1])))
 
 
 if VISUALIZE or SAVE:
@@ -208,10 +212,14 @@ if VISUALIZE or SAVE:
         
         plotFirst.plot(mv, c = color[i], label = f"Фирма {i + 1}") # , linewidth= 0.2)
     
+    if VISUALIZE_THEORY:
+        plotFirst.plot([p_NE]*len(mv), c = "#6C7B8B", linestyle = "--", label = "NE, M")
+        plotFirst.plot([p_M]*len(mv), c = "#6C7B8B", linestyle = "--")
+    
     plotFirst.set_title("Динамика цен")
     plotFirst.set_ylabel(f'Сглаженная цена (скользящее среднее по {window_size})')
     plotFirst.set_xlabel('Итерация')
-    plotFirst.legend(loc = 'lower right')
+    plotFirst.legend(loc = 'best')
 
     if profit_dynamic == "MA" or profit_dynamic == "compare":
         ### Усреднение динамики прибыли
@@ -222,10 +230,14 @@ if VISUALIZE or SAVE:
             mv = np.convolve(raw_profit_history[:, i], kernel, mode='valid')
             plotSecond.plot(mv, c = color[i], label = f"Фирма {i + 1}") # , linewidth= 0.2)
         
+        if VISUALIZE_THEORY:
+            plotSecond.plot([pi_NE]*len(mv), c = "#6C7B8B", linestyle = "--", label = "NE, M")
+            plotSecond.plot([pi_M]*len(mv), c = "#6C7B8B", linestyle = "--")
+        
         plotSecond.set_title("Динамика прибылей")
         plotSecond.set_ylabel(f'Сглаженная прибыль (скользящее среднее по {window_size})')
         plotSecond.set_xlabel('Итерация')
-        plotSecond.legend(loc = 'lower right')
+        plotSecond.legend(loc = 'best')
 
     if profit_dynamic == "real" or profit_dynamic == "compare":
         ### Подсчет прибыли для усредненных цен
@@ -249,15 +261,23 @@ if VISUALIZE or SAVE:
                 plotSecond.plot(mv, c = color[i], label = f"Фирма {i + 1}") # , linewidth= 0.2)
     
     if profit_dynamic != "compare":
+        if VISUALIZE_THEORY:
+            plotSecond.plot([pi_NE]*len(mv), c = "#6C7B8B", linestyle = "--", label = "NE, M")
+            plotSecond.plot([pi_M]*len(mv), c = "#6C7B8B", linestyle = "--")
+
         plotSecond.set_title("Динамика прибылей")
         plotSecond.set_ylabel(f'Прибыль по сглаженной цене')
         plotSecond.set_xlabel('Итерация')
-        plotSecond.legend(loc = 'lower right')
+        plotSecond.legend(loc = 'best')
     else:
+        if VISUALIZE_THEORY:
+            plotThird.plot([pi_NE]*len(mv), c = "#6C7B8B", linestyle = "--", label = "NE, M")
+            plotThird.plot([pi_M]*len(mv), c = "#6C7B8B", linestyle = "--")
+
         plotThird.set_title("Динамика прибылей")
         plotThird.set_ylabel(f'Прибыль по сглаженной цене')
         plotThird.set_xlabel('Итерация')
-        plotThird.legend(loc = 'lower right')
+        plotThird.legend(loc = 'best')
     
     plot_name = f'T_{T}_n_{n}_model_{str(firms[0])}_MV_{MEMORY_VOLUME}_mode_{Environment["firm_params"]["mode"]}_profit_dynamic_{profit_dynamic}'
 
@@ -273,6 +293,7 @@ print("Средняя цена по всем раундам:", np.mean(Price_his
 print("Средняя прибыль по всем раундам:", np.mean(Profit_history[:, 0]), np.mean(Profit_history[:, 1]))
 
 """
-
-ENV = 100, T = 200000, mode = "zhou"
+Средняя цена по всем раундам: 1.6830796000000001 1.6826728
+Средняя прибыль по всем раундам: 0.261182733098004 0.2620053694533933
+ENV = 100, T = 100000, mode = "zhou", MEMORY_VOLUME = 1, own = False
 """

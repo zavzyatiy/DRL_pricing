@@ -45,6 +45,27 @@ class demand_function:
             
             sum_exp = sum(exp_s)
             return [x/sum_exp for x in exp_s[1:]]
+    
+    def get_theory(self, c_i):
+        precision = 0.0001
+        if self.mode == "logit":
+            point_NE = 0
+            c = 0
+            while c == 0 or abs(point_NE - c) > precision:
+                point_NE = c
+                c = np.exp((point_NE - self.a)/self.mu)
+                c = c_i + self.mu * (self.n + c)/(self.n + c - 1)
+            
+            point_M = self.a
+            c = 0
+            while c == 0 or abs(point_M - c) > precision:
+                c = point_M
+                point_M = -self.mu * np.log(point_M - c_i - self.mu) + self.mu * np.log(self.mu * self.n) + self.a
+            
+            pi_NE = (point_NE - c_i)*self.distribution([point_NE]*self.n)[0]
+            pi_M = (point_M - c_i)*self.distribution([point_M]*self.n)[0]
+
+            return point_NE, point_M, pi_NE, pi_M
 
 ### начальные условия: инициализация весов для всех алгоритмов
 ### инициализация гиперпараметров: n, m, \delta, \gamma,
@@ -52,8 +73,8 @@ class demand_function:
 
 e1 = {
     "T": 100000,
-    "ENV": 1,
-    "n": 3,
+    "ENV": 100,
+    "n": 2,
     "m": 5,
     "delta": 0.95,
     "gamma": 0.5,
@@ -64,13 +85,13 @@ e1 = {
     "color": ["#FF7F00", "#1874CD", "#548B54", "#CD2626", "#CDCD00"],
     "profit_dynamic": "real", # "MA", "real", "compare"
     "VISUALIZE_THEORY": True,
-    "VISUALIZE": True,
-    "SAVE": False,
+    "VISUALIZE": False,
+    "SAVE": True,
 }
 e2 = {
     "p_inf": e1["c_i"],
     "p_sup": 2.5,
-    "arms_amo": 31,
+    "arms_amo": 51,
 }
 
 mode = "D"

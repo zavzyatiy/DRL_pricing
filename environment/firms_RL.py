@@ -134,22 +134,12 @@ class TQL:
             mem = sum([prom[i] * syst_mem**(MV - 1 - i) for i in range(MV)])
             self.previous_memory = mem
 
-    def suggest(self): # , memory):
-        # MV = self.MEMORY_VOLUME
+    def suggest(self):
         if self.t < 0:
             idx = np.random.randint(len(self.action_list))
             self.t += 1
             return idx
         
-        # MV = self.MEMORY_VOLUME
-        # L = len(self.action_list)
-        # n = self.n
-        # own = self.own
-        # syst_prorm = L
-        # syst_mem = L**(n - own)
-        # prom = [sum([x[i] * syst_prorm**(n - own - 1 - i) for i in range(n - own)]) for x in memory]
-        # mem = sum([prom[i] * syst_mem**(MV - 1 - i) for i in range(MV)])
-        # self.previous_memory = mem
         mem = self.previous_memory
 
         if self.mode == "sanchez_cartas":
@@ -169,20 +159,6 @@ class TQL:
             return best
 
     def update(self, idx, learn, response):
-
-        # if self.t == 1:
-        #     # MV = self.MEMORY_VOLUME
-        #     # L = len(self.action_list)
-        #     # n = self.n
-        #     # own = self.own
-        #     # syst_prorm = L
-        #     # syst_mem = L**(n - own)
-        #     # prom = [sum([x[i] * syst_prorm**(n - own - 1 - i) for i in range(n - own)]) for x in learn]
-        #     # lr = sum([prom[i] * syst_mem**(MV - 1 - i) for i in range(MV)])
-        #     mm = self.previous_memory
-        #     Q = self.Q_mat
-        #     Q[mm, idx] = (1 - self.alpha) * Q[mm, idx] + self.alpha * response
-        #     self.Q_mat = Q
         
         if self.t >= 1:
             MV = self.MEMORY_VOLUME
