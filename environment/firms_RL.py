@@ -84,6 +84,8 @@ class TQL:
             eps: float,
             Q_mat: list,
             MEMORY_VOLUME: int,
+            n: int,
+            own: bool,
             index_list: list,
             action_list: list,
             delta: float,
@@ -103,6 +105,8 @@ class TQL:
         self.delta = delta
         self.mode = mode
         self.MEMORY_VOLUME = MEMORY_VOLUME
+        self.n = n
+        self.own = 1 - int(own)
 
         self.previous_memory = None
         self.t = - MEMORY_VOLUME
@@ -110,24 +114,43 @@ class TQL:
         if mode == "sanchez_cartas":
             self.beta = 1.5/(10**4) # /5
         elif mode == "zhou":
-            self.eps_min = 0.01
+            self.eps_min = 0.075
             self.eps_max = 1
             self.beta = 1.5/(10**4) # /5
 
     def __repr__(self):
         return "TQL"
 
-    def suggest(self, memory):
+    def adjust_memory(self, memory):
+        ### преобразование исхода в индекс для хранения
+        if self.t >= 0:
+            MV = self.MEMORY_VOLUME
+            L = len(self.action_list)
+            n = self.n
+            own = self.own
+            syst_prorm = L
+            syst_mem = L**(n - own)
+            prom = [sum([x[i] * syst_prorm**(n - own - 1 - i) for i in range(n - own)]) for x in memory]
+            mem = sum([prom[i] * syst_mem**(MV - 1 - i) for i in range(MV)])
+            self.previous_memory = mem
+
+    def suggest(self): # , memory):
+        # MV = self.MEMORY_VOLUME
         if self.t < 0:
             idx = np.random.randint(len(self.action_list))
             self.t += 1
             return idx
         
-        # mem = memory[0]*len(self.action_list) + memory[1]
-        MV = self.MEMORY_VOLUME
-        L = len(self.action_list)
-        mem = sum([memory[i] * L**(MV - 1 - i) for i in range(len(memory))])
-        self.previous_memory = mem
+        # MV = self.MEMORY_VOLUME
+        # L = len(self.action_list)
+        # n = self.n
+        # own = self.own
+        # syst_prorm = L
+        # syst_mem = L**(n - own)
+        # prom = [sum([x[i] * syst_prorm**(n - own - 1 - i) for i in range(n - own)]) for x in memory]
+        # mem = sum([prom[i] * syst_mem**(MV - 1 - i) for i in range(MV)])
+        # self.previous_memory = mem
+        mem = self.previous_memory
 
         if self.mode == "sanchez_cartas":
             self.eps = np.exp(-self.beta*self.t)
@@ -146,18 +169,34 @@ class TQL:
             return best
 
     def update(self, idx, learn, response):
-        if self.t == 0:
-            MV = self.MEMORY_VOLUME
-            L = len(self.action_list)
-            lr = sum([learn[i] * L**(MV - 1 - i) for i in range(MV)])
-            self.Q_mat[lr, idx] = response
+
+        # if self.t == 1:
+        #     # MV = self.MEMORY_VOLUME
+        #     # L = len(self.action_list)
+        #     # n = self.n
+        #     # own = self.own
+        #     # syst_prorm = L
+        #     # syst_mem = L**(n - own)
+        #     # prom = [sum([x[i] * syst_prorm**(n - own - 1 - i) for i in range(n - own)]) for x in learn]
+        #     # lr = sum([prom[i] * syst_mem**(MV - 1 - i) for i in range(MV)])
+        #     mm = self.previous_memory
+        #     Q = self.Q_mat
+        #     Q[mm, idx] = (1 - self.alpha) * Q[mm, idx] + self.alpha * response
+        #     self.Q_mat = Q
         
-        elif self.t > 0:
+        if self.t >= 1:
             MV = self.MEMORY_VOLUME
             L = len(self.action_list)
-            lr = sum([learn[i] * L**(MV - 1 - i) for i in range(MV)])
+            n = self.n
+            own = self.own
+            syst_prorm = L
+            syst_mem = L**(n - own)
+            prom = [sum([x[i] * syst_prorm**(n - own - 1 - i) for i in range(n - own)]) for x in learn]
+            lr = sum([prom[i] * syst_mem**(MV - 1 - i) for i in range(MV)])
+
             Q = self.Q_mat
             mm = self.previous_memory
+            # print("Память фирмы", mm)
             Q[mm, idx] = (1 - self.alpha) * Q[mm, idx] + self.alpha * (response + self.delta * np.max(Q[lr]))
             self.Q_mat = Q
 

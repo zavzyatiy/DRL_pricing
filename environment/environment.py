@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from copy import deepcopy
 
 from firms_RL import epsilon_greedy, TQL
 from specification import Environment, demand_function
@@ -47,6 +48,9 @@ arms_amo = Environment["arms_amo"]
 
 # Какими цветами рисовать?
 color = Environment["color"]
+# Как усреднять прибыли: усреднять независимо
+# или считать для усредненных цен
+profit_dynamic = Environment["profit_dynamic"]
 # Выводить итоговый график?
 VISUALIZE = Environment["VISUALIZE"]
 # Сохранить итоговоый график?
@@ -55,6 +59,7 @@ SAVE = Environment["SAVE"]
 # Цены
 prices = Environment["prices"]
 MEMORY_VOLUME = Environment["firm_params"]["MEMORY_VOLUME"]
+own = Environment["firm_params"]["own"]
 
 Price_history = []
 Profit_history = []
@@ -77,9 +82,9 @@ for env in range(ENV):
 
     # firm2 = M(**firm_params)
 
-    firms = [M(**firm_params) for i in range(n)]
+    firms = [deepcopy(M(**firm_params)) for i in range(n)]
 
-    mem = [[] for i in range(n)]
+    mem = []
     
     ### Инициализация памяти платформы
     # -
@@ -120,21 +125,18 @@ for env in range(ENV):
     
     elif str(firms[0]) == "TQL":
         for t in tqdm(range(-MEMORY_VOLUME, T), f"Раунд {env + 1}"):
-        # for t in range(T + MEMORY_VOLUME):
+        # for t in range(-MEMORY_VOLUME, T):
+
             idx = []
             for i in range(n):
-                idx_i = firms[i].suggest(mem[i])
+                idx_i = firms[i].suggest()
                 idx.append(idx_i)
 
+            learn = mem.copy()
             if t < 0:
-                for i in range(n):
-                    mem[i].append(idx[i])
+                learn.append(idx)
             else:
-                for i in range(n):
-                    x = mem[i][1:]
-                    mem[i] = x + [idx[i]]
-            
-            # print(mem)
+                learn = learn[1:] + [idx]
 
             p = []
             for i in range(n):
@@ -149,8 +151,26 @@ for env in range(ENV):
 
             for i in range(n):
                 f = firms[i]
-                f.update(idx[i], mem[i], pi[i])
+                x = learn.copy()
+                if len(learn) == MEMORY_VOLUME and not(own):
+
+                    for j in range(MEMORY_VOLUME):
+                        x[j] = x[j][: i] + x[j][i + 1 :]
+
+                f.update(idx[i], x, pi[i])
                 firms[i] = f
+
+            for i in range(n):
+                f = firms[i]
+                x = learn.copy()
+                if len(learn) == MEMORY_VOLUME and not(own):
+                    for j in range(MEMORY_VOLUME):
+                        x[j] = x[j][: i] + x[j][i + 1 :]
+                    
+                f.adjust_memory(x)
+                firms[i] = f
+            
+            mem = learn.copy()
 
             raw_profit_history.append(pi)
             raw_price_history.append(p)
@@ -164,37 +184,85 @@ for env in range(ENV):
 
 if VISUALIZE or SAVE:
 
-    fig, ax = plt.subplots(1, 2, figsize= (15, 6))
+    fig, ax = plt.subplots(1, 2 + int(profit_dynamic == "compare"), figsize= (20, 5))
 
     plotFirst = ax[0]
     plotSecond = ax[1]
+    if profit_dynamic == "compare":
+        plotThird = ax[2]
 
+    ### Усреднение динамики цены
     window_size = int(0.05*T)
     kernel = np.ones(window_size) / window_size
 
     for i in range(n):
-        mv = np.convolve(raw_price_history[:, i], kernel, mode='valid') 
-        plotFirst.plot(mv, c = color[i]) # , linewidth= 0.2)
+        mv = np.convolve(raw_price_history[:, i], kernel, mode='valid')\
+        
+        if profit_dynamic == "real" or profit_dynamic == "compare":
+            if i == 0:
+                all_mv = mv.copy()
+                all_mv = all_mv.reshape(-1, 1)
+            else:
+                mv = mv.reshape(-1, 1)
+                all_mv = np.hstack((all_mv, mv))
+        
+        plotFirst.plot(mv, c = color[i], label = f"Фирма {i + 1}") # , linewidth= 0.2)
     
     plotFirst.set_title("Динамика цен")
     plotFirst.set_ylabel(f'Сглаженная цена (скользящее среднее по {window_size})')
     plotFirst.set_xlabel('Итерация')
+    plotFirst.legend(loc = 'lower right')
 
-    window_size = int(0.05*T)
-    kernel = np.ones(window_size) / window_size
+    if profit_dynamic == "MA" or profit_dynamic == "compare":
+        ### Усреднение динамики прибыли
+        window_size = int(0.05*T)
+        kernel = np.ones(window_size) / window_size
 
-    for i in range(n):
-        mv = np.convolve(raw_profit_history[:, i], kernel, mode='valid') 
-        plotSecond.plot(mv, c = color[i]) # , linewidth= 0.2)
+        for i in range(n):
+            mv = np.convolve(raw_profit_history[:, i], kernel, mode='valid')
+            plotSecond.plot(mv, c = color[i], label = f"Фирма {i + 1}") # , linewidth= 0.2)
+        
+        plotSecond.set_title("Динамика прибылей")
+        plotSecond.set_ylabel(f'Сглаженная прибыль (скользящее среднее по {window_size})')
+        plotSecond.set_xlabel('Итерация')
+        plotSecond.legend(loc = 'lower right')
+
+    if profit_dynamic == "real" or profit_dynamic == "compare":
+        ### Подсчет прибыли для усредненных цен
+        a = Environment["demand_params"]["a"]
+        mu = Environment["demand_params"]["mu"]
+
+        zeros_column = a * np.ones((all_mv.shape[0], 1), dtype=all_mv.dtype)
+        all_d = np.hstack((zeros_column, all_mv))
+        all_d = np.exp((a-all_d)/mu)
+        s = np.sum(all_d, axis = 1)
+        all_d = all_d / s[:, np.newaxis]
+        all_d = all_d[:, 1:]
+        c = c_i * np.ones(all_mv.shape)
+        smoothed_pi = (all_mv - c) * all_d
+
+        for i in range(n):
+            mv = smoothed_pi[:, i]
+            if profit_dynamic == "compare":
+                plotThird.plot(mv, c = color[i], label = f"Фирма {i + 1}") # , linewidth= 0.2)
+            else:
+                plotSecond.plot(mv, c = color[i], label = f"Фирма {i + 1}") # , linewidth= 0.2)
     
-    plotSecond.set_title("Динамика прибылей")
-    plotSecond.set_ylabel(f'Сглаженная прибыль (скользящее среднее по {window_size})')
-    plotSecond.set_xlabel('Итерация')
-
-    plot_name = ""
+    if profit_dynamic != "compare":
+        plotSecond.set_title("Динамика прибылей")
+        plotSecond.set_ylabel(f'Прибыль по сглаженной цене')
+        plotSecond.set_xlabel('Итерация')
+        plotSecond.legend(loc = 'lower right')
+    else:
+        plotThird.set_title("Динамика прибылей")
+        plotThird.set_ylabel(f'Прибыль по сглаженной цене')
+        plotThird.set_xlabel('Итерация')
+        plotThird.legend(loc = 'lower right')
+    
+    plot_name = f'T_{T}_n_{n}_model_{str(firms[0])}_MV_{MEMORY_VOLUME}_mode_{Environment["firm_params"]["mode"]}_profit_dynamic_{profit_dynamic}'
 
     if SAVE:
-        plt.savefig(".png", dpi = 1000)
+        plt.savefig(plot_name, dpi = 1000)
 
     if VISUALIZE:
         plt.show()
@@ -205,7 +273,6 @@ print("Средняя цена по всем раундам:", np.mean(Price_his
 print("Средняя прибыль по всем раундам:", np.mean(Profit_history[:, 0]), np.mean(Profit_history[:, 1]))
 
 """
-Средняя цена по всем раундам: 1.63549825501745 1.6407975932740673
-Средняя прибыль по всем раундам: 0.27545766483096434 0.2725363997035166
+
 ENV = 100, T = 200000, mode = "zhou"
 """
