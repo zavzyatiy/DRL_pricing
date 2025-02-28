@@ -73,7 +73,7 @@ class demand_function:
 
 e1 = {
     "T": 100000,
-    "ENV": 100,
+    "ENV": 1,
     "n": 2,
     "m": 5,
     "delta": 0.95,
@@ -86,7 +86,7 @@ e1 = {
     "profit_dynamic": "real", # "MA", "real", "compare"
     "VISUALIZE_THEORY": True,
     "VISUALIZE": False,
-    "SAVE": True,
+    "SAVE": False,
 }
 e2 = {
     "p_inf": e1["c_i"],

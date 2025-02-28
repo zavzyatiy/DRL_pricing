@@ -112,11 +112,11 @@ class TQL:
         self.t = - MEMORY_VOLUME
 
         if mode == "sanchez_cartas":
-            self.beta = 1.5/(10**4) # /5
+            self.beta = 1.5/(10**(4 + MEMORY_VOLUME*(n + self.own)))
         elif mode == "zhou":
             self.eps_min = 0.075
             self.eps_max = 1
-            self.beta = 1.5/(10**4) # /5
+            self.beta = 1.5/(10**(4 + MEMORY_VOLUME*(n + self.own)))
 
     def __repr__(self):
         return "TQL"
