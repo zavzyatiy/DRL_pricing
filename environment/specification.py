@@ -35,6 +35,7 @@ class demand_function:
     
     def distribution(self, prices):
         assert len(prices) == self.n, f"Demand is built for n = {self.n}, not for {len(prices)}"
+
         if self.mode == "logit":
             s = list(prices)
             if self.a:
@@ -61,13 +62,15 @@ e1 = {
     "v_minus": 0,
     "eta": 0.05,
     "color": ["#FF7F00", "#1874CD", "#548B54", "#CD2626", "#CDCD00"],
+    "profit_dynamic": "real", # "MA", "real", "compare"
+    "VISUALIZE_THEORY": True,
     "VISUALIZE": True,
-    "SAVE": True,
+    "SAVE": False,
 }
 e2 = {
     "p_inf": e1["c_i"],
     "p_sup": 2.5,
-    "arms_amo": 21,
+    "arms_amo": 31,
 }
 
 mode = "D"
@@ -86,15 +89,18 @@ e3 = {
     },
 }
 
-MEMORY_VOLUME = 2
+MEMORY_VOLUME = 1
+own = False
 
 e4 = {
     "prices": prices,
     "firm_model": TQL, # epsilon_greedy
     "firm_params": {
-        "eps": 0.6,
-        "Q_mat": np.zeros((len(prices)**MEMORY_VOLUME, len(prices))),
+        "eps": 0.5,
+        "Q_mat": np.zeros((len(prices)**(MEMORY_VOLUME * (e1["n"] - (1 - int(own)))), len(prices))),
         "MEMORY_VOLUME": MEMORY_VOLUME,
+        "n": e1["n"],
+        "own": own,
         "index_list": [x for x in range(len(prices)**MEMORY_VOLUME)],
         "action_list": prices,
         "delta": e1["delta"],
@@ -103,4 +109,11 @@ e4 = {
     },
 }
 
-Environment = e1 | e2 | e3 | e4
+e5 = {
+
+}
+
+Environment = e1 | e2 | e3 | e4 | e5
+
+# a = [1, 2]
+# print(a[:0] + a[1:], a[:1] + a[2:])
