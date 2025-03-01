@@ -5,11 +5,20 @@
 ### Здесь будут нужные функции для использования в промежуточных частях кода
 
 import numpy as np
-import matplotlib.pyplot as plt
+import torch.nn as nn
 import random
+from copy import deepcopy
 
 # random.seed(42)
 # torch.manual_seed(42)
+
+"""
+##################################################
+Code for TN_DDQN is a custom version of 00ber implementation of DQN.
+Orginal: https://github.com/00ber/Deep-Q-Networks/blob/main/src/airstriker-genesis/agent.py
+##################################################
+"""
+
 
 class epsilon_greedy:
      
@@ -86,6 +95,7 @@ class TQL:
             MEMORY_VOLUME: int,
             n: int,
             own: bool,
+            ONLY_OWN: bool, 
             index_list: list,
             action_list: list,
             delta: float,
@@ -107,16 +117,19 @@ class TQL:
         self.MEMORY_VOLUME = MEMORY_VOLUME
         self.n = n
         self.own = 1 - int(own)
+        if ONLY_OWN:
+            self.n = 1
+            self.own = 0
 
         self.previous_memory = None
         self.t = - MEMORY_VOLUME
 
         if mode == "sanchez_cartas":
-            self.beta = 1.5/(10**(4 + MEMORY_VOLUME*(n + self.own)))
+            self.beta = 1.5/(10**(4 + 0* MEMORY_VOLUME*(n + self.own)))
         elif mode == "zhou":
-            self.eps_min = 0.075
+            self.eps_min = 0.025
             self.eps_max = 1
-            self.beta = 1.5/(10**(4 + MEMORY_VOLUME*(n + self.own)))
+            self.beta = 1.5/(10**(4 + 0* MEMORY_VOLUME*(n + self.own)))
 
     def __repr__(self):
         return "TQL"
@@ -177,7 +190,39 @@ class TQL:
             self.Q_mat = Q
 
 
-class DQN:
+class DQN(nn.Module):
+    """
+    mini cnn structure
+    input -> (conv2d + relu) x 3 -> flatten -> (dense + relu) x 2 -> output
+    """
+
+    def __init__(self, input_dim, action_dim):
+
+        super().__init__()
+
+        self.online = nn.Sequential(
+            nn.Linear(input_dim, 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, action_dim)
+        )
+
+        
+        self.target = deepcopy(self.online)
+
+        # Q_target parameters are frozen.
+        for p in self.target.parameters():
+            p.requires_grad = False
+
+    def forward(self, input, model):
+        if model == "online":
+            return self.online(input)
+        elif model == "target":
+            return self.target(input)
+
+
+class TN_DDQN:
 
     def __init__(
             self,
@@ -186,7 +231,7 @@ class DQN:
         pass
 
     def __repr__(self):
-        return "DQN"
+        return "TN_DDQN"
 
     def suggest(self, memory):
         pass

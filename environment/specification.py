@@ -73,7 +73,7 @@ class demand_function:
 
 e1 = {
     "T": 100000,
-    "ENV": 1,
+    "ENV": 100,
     "n": 2,
     "m": 5,
     "delta": 0.95,
@@ -83,15 +83,16 @@ e1 = {
     "v_minus": 0,
     "eta": 0.05,
     "color": ["#FF7F00", "#1874CD", "#548B54", "#CD2626", "#CDCD00"],
-    "profit_dynamic": "real", # "MA", "real", "compare"
+    "profit_dynamic": "compare", # "MA", "real", "compare"
+    "loc": "lower left",
     "VISUALIZE_THEORY": True,
     "VISUALIZE": False,
-    "SAVE": False,
+    "SAVE": True,
 }
 e2 = {
     "p_inf": e1["c_i"],
     "p_sup": 2.5,
-    "arms_amo": 51,
+    "arms_amo": 101,
 }
 
 mode = "D"
@@ -112,16 +113,18 @@ e3 = {
 
 MEMORY_VOLUME = 1
 own = False
+ONLY_OWN = False
 
 e4 = {
     "prices": prices,
     "firm_model": TQL, # epsilon_greedy
     "firm_params": {
-        "eps": 0.5,
+        "eps": 0.4,
         "Q_mat": np.zeros((len(prices)**(MEMORY_VOLUME * (e1["n"] - (1 - int(own)))), len(prices))),
         "MEMORY_VOLUME": MEMORY_VOLUME,
         "n": e1["n"],
         "own": own,
+        "ONLY_OWN": ONLY_OWN,
         "index_list": [x for x in range(len(prices)**MEMORY_VOLUME)],
         "action_list": prices,
         "delta": e1["delta"],

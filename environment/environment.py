@@ -4,7 +4,7 @@
 
 import random
 import numpy as np
-import torch
+import torch.nn as nn
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from copy import deepcopy
@@ -57,11 +57,14 @@ VISUALIZE = Environment["VISUALIZE"]
 VISUALIZE_THEORY = Environment["VISUALIZE_THEORY"]
 # Сохранить итоговоый график?
 SAVE = Environment["SAVE"]
+# С какой стороны отображать легенду на графиках
+loc = Environment["loc"]
 
 # Цены
 prices = Environment["prices"]
 MEMORY_VOLUME = Environment["firm_params"]["MEMORY_VOLUME"]
 own = Environment["firm_params"]["own"]
+ONLY_OWN = Environment["firm_params"]["ONLY_OWN"]
 
 Price_history = []
 Profit_history = []
@@ -156,10 +159,12 @@ for env in range(ENV):
             for i in range(n):
                 f = firms[i]
                 x = learn.copy()
-                if len(learn) == MEMORY_VOLUME and not(own):
-
+                if len(learn) == MEMORY_VOLUME and not(own) and not(ONLY_OWN):
                     for j in range(MEMORY_VOLUME):
                         x[j] = x[j][: i] + x[j][i + 1 :]
+                elif len(learn) == MEMORY_VOLUME and ONLY_OWN:
+                    for j in range(MEMORY_VOLUME):
+                        x[j] = [x[j][i]]
 
                 f.update(idx[i], x, pi[i])
                 firms[i] = f
@@ -167,9 +172,12 @@ for env in range(ENV):
             for i in range(n):
                 f = firms[i]
                 x = learn.copy()
-                if len(learn) == MEMORY_VOLUME and not(own):
+                if len(learn) == MEMORY_VOLUME and not(own) and not(ONLY_OWN):
                     for j in range(MEMORY_VOLUME):
                         x[j] = x[j][: i] + x[j][i + 1 :]
+                elif len(learn) == MEMORY_VOLUME and ONLY_OWN:
+                    for j in range(MEMORY_VOLUME):
+                        x[j] = [x[j][i]]
                     
                 f.adjust_memory(x)
                 firms[i] = f
@@ -179,14 +187,23 @@ for env in range(ENV):
             raw_profit_history.append(pi)
             raw_price_history.append(p)
     
+    elif str(firms[0]) == "TN_DDQN":
+        pass
+
     raw_price_history = np.array(raw_price_history)
     raw_profit_history = np.array(raw_profit_history)
 
-    Price_history.append(tuple([np.mean(raw_price_history[-int(T/100):, i]) for i in range(n)]))
-    Profit_history.append(tuple([np.mean(raw_profit_history[-int(T/100):, i]) for i in range(n)]))
+    Price_history.append(tuple([np.mean(raw_price_history[-int(T/20):, i]) for i in range(n)]))
+    Profit_history.append(tuple([np.mean(raw_profit_history[-int(T/20):, i]) for i in range(n)]))
 
 
 if VISUALIZE or SAVE:
+
+    # plt.figure(figsize=(20, 5))
+    # for i in range(n):
+    #     plt.plot(raw_price_history[:, i], c = color[i], label = f"Фирма {i + 1}", linewidth= 0.2)
+
+    # plt.show()
 
     fig, ax = plt.subplots(1, 2 + int(profit_dynamic == "compare"), figsize= (20, 5))
 
@@ -219,7 +236,7 @@ if VISUALIZE or SAVE:
     plotFirst.set_title("Динамика цен")
     plotFirst.set_ylabel(f'Сглаженная цена (скользящее среднее по {window_size})')
     plotFirst.set_xlabel('Итерация')
-    plotFirst.legend(loc = 'best')
+    plotFirst.legend(loc = loc)
 
     if profit_dynamic == "MA" or profit_dynamic == "compare":
         ### Усреднение динамики прибыли
@@ -237,7 +254,7 @@ if VISUALIZE or SAVE:
         plotSecond.set_title("Динамика прибылей")
         plotSecond.set_ylabel(f'Сглаженная прибыль (скользящее среднее по {window_size})')
         plotSecond.set_xlabel('Итерация')
-        plotSecond.legend(loc = 'best')
+        plotSecond.legend(loc = loc)
 
     if profit_dynamic == "real" or profit_dynamic == "compare":
         ### Подсчет прибыли для усредненных цен
@@ -268,7 +285,7 @@ if VISUALIZE or SAVE:
         plotSecond.set_title("Динамика прибылей")
         plotSecond.set_ylabel(f'Прибыль по сглаженной цене')
         plotSecond.set_xlabel('Итерация')
-        plotSecond.legend(loc = 'best')
+        plotSecond.legend(loc = loc)
     else:
         if VISUALIZE_THEORY:
             plotThird.plot([pi_NE]*len(mv), c = "#6C7B8B", linestyle = "--", label = "NE, M")
@@ -277,7 +294,7 @@ if VISUALIZE or SAVE:
         plotThird.set_title("Динамика прибылей")
         plotThird.set_ylabel(f'Прибыль по сглаженной цене')
         plotThird.set_xlabel('Итерация')
-        plotThird.legend(loc = 'best')
+        plotThird.legend(loc = loc)
     
     plot_name = f'T_{T}_n_{n}_model_{str(firms[0])}_MV_{MEMORY_VOLUME}_own_{own}_mode_{Environment["firm_params"]["mode"]}_profit_dynamic_{profit_dynamic}'
 
