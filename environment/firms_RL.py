@@ -10,6 +10,7 @@ import torch
 from torch.distributions.categorical import Categorical
 import torch.nn.functional as F
 import random
+import torch.optim as optim
 from copy import deepcopy
 from collections import deque
 
@@ -18,11 +19,10 @@ from collections import deque
 # torch.manual_seed(42)
 
 """
-####################################################################################################
-Code for TN_DDQN is a custom version of 00ber implementation of DQN.
+##################################################
+COPYPASTED FOR FUTURE IMPLAMINTATION!
 Orginal: https://github.com/00ber/Deep-Q-Networks/blob/main/src/airstriker-genesis/agent.py
-Also important for invalid action masking: https://github.com/vwxyzjn/invalid-action-masking/blob/master/ppo.py
-####################################################################################################
+##################################################
 """
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -197,74 +197,232 @@ class TQL:
             self.Q_mat = Q
 
 
-
-
-
-class DQN(nn.Module):
+class DQNet(nn.Module):
     """
     mini cnn structure
-    input -> (conv2d + relu) x 3 -> flatten -> (dense + relu) x 2 -> output
+    input -> (linear + relu) x 2 -> output
     """
 
-    def __init__(self, input_dim, action_dim):
-
+    def __init__(self, input_dim, inventory_actions, price_actions):
         super().__init__()
-
+        
+        sloy = 256
+        
         self.online = nn.Sequential(
-            nn.Linear(input_dim, 256),
+            nn.Linear(input_dim, sloy),
             nn.ReLU(),
-            nn.Linear(256, 256),
+            nn.Linear(sloy, sloy),
             nn.ReLU(),
-            nn.Linear(256, action_dim)
         )
 
+        self.inventory_size = len(inventory_actions)
+        self.price_size = len(price_actions)
+
+        self.inventory_head = nn.Linear(sloy, self.inventory_size)
+        self.price_head = nn.Linear(sloy, self.price_size)
         
+        # Target network
         self.target = deepcopy(self.online)
+        self.target_inventory = deepcopy(self.inventory_head)
+        self.target_price = deepcopy(self.price_head)
 
         # Q_target parameters are frozen.
         for p in self.target.parameters():
             p.requires_grad = False
+        for p in self.target_inventory.parameters():
+            p.requires_grad = False
+        for p in self.target_price.parameters():
+            p.requires_grad = False
 
-    def forward(self, input, model):
+    def forward(self, x, model="online"):
         if model == "online":
-            return self.online(input)
-        elif model == "target":
-            return self.target(input)
+            x = self.online(x)
+            inv = self.inventory_head(x)
+            prc = self.price_head(x)
+            return inv, prc
+        else:
+            x = self.target(x)
+            inv = self.target_inventory(x)
+            prc = self.target_price(x)
+            return inv, prc
 
 
 class TN_DDQN:
-
     def __init__(
-            self,
-			):
+            self, 
+            state_dim: int,
+            inventory_actions: list,
+            price_actions: list,
+            batch_size:int,  # =32,
+            MEMORY_VOLUME: int,
+            gamma: float, # =0.95,
+            lr: float, # =0.001,
+            eps: float,
+            mode: str,
+            target_update_freq: int,
+            memory_size: int,
+            ):
+        
+        self.state_dim = state_dim
+        self.inventory_actions = inventory_actions
+        self.price_actions = price_actions
+        
+        # Q-network
+        self.online = DQNet(state_dim, inventory_actions, price_actions)
+        self.target_net = deepcopy(self.online)
+        
+        # Hyperparameters
+        self.batch_size = batch_size
+        self.gamma = gamma
+        self.eps = eps
+        self.t = - batch_size - MEMORY_VOLUME
+        self.mode = mode
 
-        pass
+        if mode == "sanchez_cartas":
+            self.beta = 1.5/(10**4)
+        elif mode == "zhou":
+            self.eps_min = 0.025
+            self.eps_max = 1
+            self.beta = 1.5/(10**4)
+        
+        self.target_update_freq = target_update_freq
+        self.memory = deque(maxlen=memory_size)
+        
+        self.optimizer = torch.optim.Adam(self.online.parameters(), lr=lr)
 
     def __repr__(self):
-        return "TN_DDQN"
+        return "TN_DDQN"    
 
-    def suggest(self, memory):
-        pass
+    def _get_state_vector(self, firm_state):
+        """Преобразует состояние фирмы в тензор"""
+        inventory = firm_state['current_inventory']
+        comp_prices = np.array(firm_state['competitors_prices']).flatten()
+        return torch.FloatTensor([inventory] + comp_prices.tolist())
 
-    def update(self, idx, memory, response):
-        pass
+
+    def suggest_actions(self, firm_state):
+        """Возвращает действия (инвентарь, цену)"""
+        if self.t < 0:
+            inv_idx = random.randint(0, len(self.inventory_actions)-1)
+            price_idx = random.randint(0, len(self.price_actions)-1)
+            self.t += 1
+            return (inv_idx, price_idx)
+
+        state = self._get_state_vector(firm_state)
+        
+        if random.random() < self.eps:
+            inv_idx = random.randint(0, len(self.inventory_actions)-1)
+            price_idx = random.randint(0, len(self.price_actions)-1)
+        else:
+            with torch.no_grad():
+                inv_q, price_q = self.online(state.unsqueeze(0), 'online')
+                inv_idx = torch.argmax(inv_q).item()
+                price_idx = torch.argmax(price_q).item()
+        
+        # Decay exploration rate
+        if self.mode == "sanchez_cartas":
+            self.eps = np.exp(-self.beta*self.t)
+        elif self.mode == "zhou":
+            self.eps = self.eps_min + (self.eps_max - self.eps_min) * np.exp(-self.beta*self.t)
+        
+        self.t += 1
+
+        return (inv_idx, price_idx)
 
 
+    def cache_experience(self, state, actions, reward, next_state):
+        """Сохраняет опыт в replay buffer"""
+        state_vec = self._get_state_vector(state)
+        next_vec = self._get_state_vector(next_state)
+        
+        if len(state_vec) == self.state_dim:
+            self.memory.append((
+                state_vec,
+                actions,
+                reward,
+                next_vec,
+            ))
 
-### Архив возможных параметризаций алгоритмов для фирм:
 
-# mode = None # None, "sanchez_cartas", "zhou"
+    def _update_model(self):
+        if len(self.memory) < self.batch_size:
+            return 0.0
 
-# firm1 = epsilon_greedy(
-#     eps,
-#     np.zeros(len(prices)),
-#     prices,
-#     mode = mode,
-#     )
+        batch = random.sample(self.memory, self.batch_size)
+        states = torch.stack([x[0] for x in batch])
+        actions = torch.LongTensor([x[1] for x in batch])
+        rewards = torch.FloatTensor([x[2] for x in batch])
+        next_states = torch.stack([x[3] for x in batch])
 
-# firm2 = epsilon_greedy(
-#     eps,
-#     np.zeros(len(prices)),
-#     prices,
-#     mode = mode,
-#     )
+        # Current Q values (online network)
+        inv_q_online, price_q_online = self.online(states, 'online')
+        inv_selected = inv_q_online.gather(1, actions[:, 0].unsqueeze(1))
+        price_selected = price_q_online.gather(1, actions[:, 1].unsqueeze(1))
+
+        # Target Q values (target network)
+        with torch.no_grad():
+            inv_q_target, price_q_target = self.target_net(next_states, 'target')
+            inv_max = inv_q_target.max(1)[0]
+            price_max = price_q_target.max(1)[0]
+            targets = rewards + self.gamma * (inv_max + price_max)
+
+        # Loss calculation
+        loss_inv = F.mse_loss(inv_selected.squeeze(), targets)
+        loss_price = F.mse_loss(price_selected.squeeze(), targets)
+        total_loss = loss_inv + loss_price
+
+        # Optimize
+        self.optimizer.zero_grad()
+        total_loss.backward()
+        self.optimizer.step()
+
+        if self.t >= 0 and self.t % self.target_update_freq == 0:
+            self.target_net.load_state_dict(self.online.state_dict())
+
+        return total_loss.item()
+
+
+    def update(self):
+        """Обновление модели на основе данных в памяти"""
+        loss = self._update_model()
+        return loss
+
+
+    def save(self, path):
+        """Сохранение модели"""
+        torch.save({
+            'model': self.online.state_dict(),
+            'exploration': self.eps,
+            'memory': self.memory
+        }, path)
+
+
+    def load(self, path):
+        """Загрузка модели"""
+        checkpoint = torch.load(path)
+        self.online.load_state_dict(checkpoint['model'])
+        self.target_net.load_state_dict(checkpoint['model'])
+        self.eps = checkpoint.get('exploration', 1.0)
+        self.memory = checkpoint.get('memory', deque(maxlen=self.memory_size))
+
+#### ЭТО НУЖНО СДЕЛАТЬ!
+# class TN_DDQN:
+     
+#     def __init__(
+#             self,
+            
+# 			):
+
+#         pass
+
+#     def __repr__(self):
+#         return "TN_DDQN"
+
+#     def adjust_memory(self, ):
+#         pass
+
+#     def suggest(self):
+#         pass
+
+#     def update(self, ):
+#         pass

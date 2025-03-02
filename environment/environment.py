@@ -17,6 +17,10 @@ from specification import Environment, demand_function
 # np.random.seed(42)
 # torch.manual_seed(42)
 
+M = Environment["firm_model"]
+firm_params = Environment["firm_params"]
+TN_DDQN = int(int(str(M(**firm_params)) == "TN_DDQN"))
+
 ### количество итераций внутри среды
 T = Environment["T"]
 
@@ -45,7 +49,11 @@ p_inf = Environment["p_inf"]
 p_sup = Environment["p_sup"]
 # количество цен для перебора при
 # дискретизации пространства возможных цен
-arms_amo = Environment["arms_amo"]
+if TN_DDQN == 1:
+    arms_amo_price = Environment["arms_amo_price"]
+    arms_amo_inv = Environment["arms_amo_inv"]
+else:
+    arms_amo = Environment["arms_amo_price"]
 
 # Какими цветами рисовать?
 color = Environment["color"]
@@ -63,36 +71,50 @@ loc = Environment["loc"]
 
 # Цены
 prices = Environment["prices"]
-MEMORY_VOLUME = Environment["firm_params"]["MEMORY_VOLUME"]
-own = Environment["firm_params"]["own"]
-ONLY_OWN = Environment["firm_params"]["ONLY_OWN"]
+if TN_DDQN == 1:
+    inventory = Environment["inventory"]
+
+# Дополнительные параметры, характерные для моделей
+if str(M(**firm_params)) == "TQL":
+    MEMORY_VOLUME = Environment["firm_params"]["MEMORY_VOLUME"]
+    own = Environment["firm_params"]["own"]
+    ONLY_OWN = Environment["firm_params"]["ONLY_OWN"]
+
+elif TN_DDQN == 1:
+    MEMORY_VOLUME = Environment["firm_params"]["MEMORY_VOLUME"]
+    batch_size = Environment["firm_params"]["batch_size"]
+    own = Environment["own"]
 
 Price_history = []
 Profit_history = []
+if TN_DDQN == 1:
+    Stock_history = []
 
 demand_params = Environment["demand_params"]
 spros = demand_function(**demand_params)
 if VISUALIZE_THEORY:
     p_NE, p_M, pi_NE, pi_M = spros.get_theory(c_i)
+    inv_NE, inv_M = spros.distribution([p_NE]*n)[0], spros.distribution([p_M]*n)[0]
 
 ### ПОКА ВСЕ НАПИСАНО ДЛЯ "D"
 for env in range(ENV):
 
     raw_price_history = []
     raw_profit_history = []
+    if TN_DDQN == 1:
+        raw_stock_history = []
 
     ### Инициализация однородных фирм
 
-    M = Environment["firm_model"]
-    firm_params = Environment["firm_params"]
-
-    # firm1 = M(**firm_params)
-
-    # firm2 = M(**firm_params)
+    # M = Environment["firm_model"]
+    # firm_params = Environment["firm_params"]
 
     firms = [deepcopy(M(**firm_params)) for i in range(n)]
 
     mem = []
+
+    if TN_DDQN == 1:
+        x_t = [0 for i in range(n)]
     
     ### Инициализация памяти платформы
     # -
@@ -134,7 +156,6 @@ for env in range(ENV):
     elif str(firms[0]) == "TQL":
         for t in tqdm(range(-MEMORY_VOLUME, T), f"Раунд {env + 1}"):
         # for t in range(-MEMORY_VOLUME, T):
-
             idx = []
             for i in range(n):
                 idx_i = firms[i].suggest()
@@ -189,36 +210,120 @@ for env in range(ENV):
             raw_price_history.append(p)
     
     elif str(firms[0]) == "TN_DDQN":
-        pass
+        for t in tqdm(range(- MEMORY_VOLUME - batch_size, T), f"Раунд {env + 1}"):
+        # for t in range(- MEMORY_VOLUME - batch_size, T):
+            # print("!!!!!!!!", t)
+            
+            idxs = []
+            for i in range(n):
+                state_i = mem.copy()
+
+                if len(state_i) == MEMORY_VOLUME and not(own):
+                    for j in range(MEMORY_VOLUME):
+                        state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
+                
+                firm_state = {
+                    'current_inventory': x_t[i],
+                    'competitors_prices': state_i,
+                }
+
+                idxs_i = firms[i].suggest_actions(firm_state)
+                idxs.append(idxs_i)
+
+            learn = mem.copy()
+            # print("MEM", mem)
+            if len(learn) < MEMORY_VOLUME:
+                learn.append([x[1] for x in idxs])
+            else:
+                learn = learn[1:] + [[x[1] for x in idxs]]
+            # print("LEARN", learn)
+            inv = []
+            p = []
+            for i in range(n):
+                if inventory[idxs[i][0]] >= x_t[i]:
+                    inv.append(inventory[idxs[i][0]])
+                else:
+                    inv.append(x_t[i])
+                
+                p.append(prices[idxs[i][1]])
+
+            doli = spros.distribution(p)
+
+            pi = []
+            for i in range(n):
+                pi_i = p[i] * doli[i] - c_i * (inv[i] - x_t[i]) - h_plus * max(0, inv[i] - doli[i]) - v_minus * min(0, inv[i] - doli[i])
+                pi.append(pi_i)
+
+            if len(learn) == MEMORY_VOLUME:
+                for i in range(n):
+                    state_i = mem.copy()
+                    if len(state_i) == MEMORY_VOLUME and not(own):
+                        for j in range(MEMORY_VOLUME):
+                            state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
+                    
+                    new = learn.copy()
+                    if len(new) == MEMORY_VOLUME and not(own):
+                        for j in range(MEMORY_VOLUME):
+                            new[j] = new[j][: i] + new[j][i + 1 :]
+                    
+                    prev_state = {
+                        'current_inventory': x_t[i],
+                        'competitors_prices': state_i,
+                    }
+
+                    new_state = {
+                        'current_inventory': max(0, inv[i] - doli[i]),
+                        'competitors_prices': new,
+                    }
+
+                    firms[i].cache_experience(prev_state, idxs[i], pi[i], new_state)
+
+            for i in range(n):
+                x_t[i] = max(0, inv[i] - doli[i])
+
+            for i in range(n):
+                firms[i].update()
+            
+            mem = learn.copy()
+
+            raw_profit_history.append(pi)
+            raw_price_history.append(p)
+            raw_stock_history.append(inv)
 
     raw_price_history = np.array(raw_price_history)
     raw_profit_history = np.array(raw_profit_history)
+    if TN_DDQN == 1:
+        raw_stock_history = np.array(raw_stock_history)
 
     Price_history.append(tuple([np.mean(raw_price_history[-int(T/20):, i]) for i in range(n)]))
     Profit_history.append(tuple([np.mean(raw_profit_history[-int(T/20):, i]) for i in range(n)]))
+    if TN_DDQN == 1:
+        Stock_history.append(tuple([np.mean(raw_stock_history[-int(T/20):, i]) for i in range(n)]))
 
 
 if VISUALIZE or SAVE:
 
-    # plt.figure(figsize=(20, 5))
-    # for i in range(n):
-    #     plt.plot(raw_price_history[:, i], c = color[i], label = f"Фирма {i + 1}", linewidth= 0.2)
+    profit_dynamic = TN_DDQN * "MA" + (1 - TN_DDQN) * profit_dynamic
+    fig, ax = plt.subplots(1 + TN_DDQN, 2 + (1 - TN_DDQN) * int(profit_dynamic == "compare"), figsize= (20, 5*(1 + TN_DDQN*1.1)))
 
-    # plt.show()
-
-    fig, ax = plt.subplots(1, 2 + int(profit_dynamic == "compare"), figsize= (20, 5))
-
-    plotFirst = ax[0]
-    plotSecond = ax[1]
-    if profit_dynamic == "compare":
-        plotThird = ax[2]
+    if TN_DDQN == 0:
+        plotFirst = ax[0]
+        plotSecond = ax[1]
+        if profit_dynamic == "compare":
+            plotThird = ax[2]
+    else:
+        plotFirst = ax[0][0]
+        plotSecond = ax[0][1]
+        plotStock = ax[1][0]
+        if profit_dynamic == "compare":
+            plotThird = ax[1][1]
 
     ### Усреднение динамики цены
     window_size = int(0.05*T)
     kernel = np.ones(window_size) / window_size
 
     for i in range(n):
-        mv = np.convolve(raw_price_history[:, i], kernel, mode='valid')\
+        mv = np.convolve(raw_price_history[:, i], kernel, mode='valid')
         
         if profit_dynamic == "real" or profit_dynamic == "compare":
             if i == 0:
@@ -230,6 +335,7 @@ if VISUALIZE or SAVE:
         
         plotFirst.plot(mv, c = color[i], label = f"Фирма {i + 1}") # , linewidth= 0.2)
     
+    
     if VISUALIZE_THEORY:
         plotFirst.plot([p_NE]*len(mv), c = "#6C7B8B", linestyle = "--", label = "NE, M")
         plotFirst.plot([p_M]*len(mv), c = "#6C7B8B", linestyle = "--")
@@ -238,6 +344,34 @@ if VISUALIZE or SAVE:
     plotFirst.set_ylabel(f'Сглаженная цена (скользящее среднее по {window_size})')
     plotFirst.set_xlabel('Итерация')
     plotFirst.legend(loc = loc)
+
+    if TN_DDQN == 1:
+        ### Усреднение динамики запасов
+        window_size = int(0.05*T)
+        kernel = np.ones(window_size) / window_size
+
+        for i in range(n):
+            mv = np.convolve(raw_stock_history[:, i], kernel, mode='valid')
+            
+            if profit_dynamic == "real" or profit_dynamic == "compare":
+                if i == 0:
+                    all_mv = mv.copy()
+                    all_mv = all_mv.reshape(-1, 1)
+                else:
+                    mv = mv.reshape(-1, 1)
+                    all_mv = np.hstack((all_mv, mv))
+            
+            plotStock.plot(mv, c = color[i], label = f"Фирма {i + 1}") # , linewidth= 0.2)
+        
+        
+        if VISUALIZE_THEORY:
+            plotStock.plot([inv_NE]*len(mv), c = "#6C7B8B", linestyle = "--", label = "M, NE")
+            plotStock.plot([inv_M]*len(mv), c = "#6C7B8B", linestyle = "--")
+        
+        plotStock.set_title("Динамика запасов")
+        plotStock.set_ylabel(f'Сглаженные объемы (скользящее среднее по {window_size})')
+        plotStock.set_xlabel('Итерация')
+        plotStock.legend(loc = loc)
 
     if profit_dynamic == "MA" or profit_dynamic == "compare":
         ### Усреднение динамики прибыли
@@ -278,24 +412,24 @@ if VISUALIZE or SAVE:
             else:
                 plotSecond.plot(mv, c = color[i], label = f"Фирма {i + 1}") # , linewidth= 0.2)
     
-    if profit_dynamic != "compare":
-        if VISUALIZE_THEORY:
-            plotSecond.plot([pi_NE]*len(mv), c = "#6C7B8B", linestyle = "--", label = "NE, M")
-            plotSecond.plot([pi_M]*len(mv), c = "#6C7B8B", linestyle = "--")
+        if profit_dynamic != "compare":
+            if VISUALIZE_THEORY:
+                plotSecond.plot([pi_NE]*len(mv), c = "#6C7B8B", linestyle = "--", label = "NE, M")
+                plotSecond.plot([pi_M]*len(mv), c = "#6C7B8B", linestyle = "--")
 
-        plotSecond.set_title("Динамика прибылей")
-        plotSecond.set_ylabel(f'Прибыль по сглаженной цене')
-        plotSecond.set_xlabel('Итерация')
-        plotSecond.legend(loc = loc)
-    else:
-        if VISUALIZE_THEORY:
-            plotThird.plot([pi_NE]*len(mv), c = "#6C7B8B", linestyle = "--", label = "NE, M")
-            plotThird.plot([pi_M]*len(mv), c = "#6C7B8B", linestyle = "--")
+            plotSecond.set_title("Динамика прибылей")
+            plotSecond.set_ylabel(f'Прибыль по сглаженной цене')
+            plotSecond.set_xlabel('Итерация')
+            plotSecond.legend(loc = loc)
+        else:
+            if VISUALIZE_THEORY:
+                plotThird.plot([pi_NE]*len(mv), c = "#6C7B8B", linestyle = "--", label = "NE, M")
+                plotThird.plot([pi_M]*len(mv), c = "#6C7B8B", linestyle = "--")
 
-        plotThird.set_title("Динамика прибылей")
-        plotThird.set_ylabel(f'Прибыль по сглаженной цене')
-        plotThird.set_xlabel('Итерация')
-        plotThird.legend(loc = loc)
+            plotThird.set_title("Динамика прибылей")
+            plotThird.set_ylabel(f'Прибыль по сглаженной цене')
+            plotThird.set_xlabel('Итерация')
+            plotThird.legend(loc = loc)
     
     plot_name = f'T_{T}_n_{n}_model_{str(firms[0])}_MV_{MEMORY_VOLUME}_own_{own}_mode_{Environment["firm_params"]["mode"]}_profit_dynamic_{profit_dynamic}'
 
@@ -309,8 +443,26 @@ if VISUALIZE or SAVE:
 Price_history = np.array(Price_history)
 Profit_history = np.array(Profit_history)
 
-print("Средняя цена по всем раундам:", " ".join([str(np.mean(Price_history[:, i])) for i in range(n)]))
-print("Средняя прибыль по всем раундам:", " ".join([str(np.mean(Profit_history[:, i])) for i in range(n)]))
+print("Средняя цена по всем раундам:", " ".join([str(round(np.mean(Price_history[:, i]), 3)) for i in range(n)]))
+print("Средняя прибыль по всем раундам:", " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)]))
+
+if TN_DDQN == 1:
+    Stock_history = np.array(Stock_history)
+    print("Среднии запасы по всем раундам:", " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)]))
+
+print("-"*20*n)
+print("Теоретические цены:", round(p_NE , 3), round(p_M , 3))
+print("Теоретические прибыли:", round(pi_NE , 3), round(pi_M , 3))
+
+if TN_DDQN == 1:
+    print("Теоретические инв. в запасы:", round(inv_NE , 3), round(inv_M , 3))
+
+print("-"*20*n)
+print("Индекс сговора по цене:", str(round(100 * (np.mean(Price_history) - p_NE)/(p_M - p_NE), 2)) + "%")
+print("Индекс сговора по прибыли:", str(round(100 * (np.mean(Profit_history) - pi_NE)/(pi_M - pi_NE), 2)) + "%")
+
+if TN_DDQN == 1:
+    print("Индекс сговора по запасам:", str(round(100 * (np.mean(Stock_history) - inv_NE)/(inv_M - inv_NE), 2)) + "%")
 
 """
 Средняя цена по всем раундам: 1.6830796000000001 1.6826728

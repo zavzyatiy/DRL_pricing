@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from firms_RL import epsilon_greedy, TQL
+from firms_RL import epsilon_greedy, TQL, TN_DDQN
 
 ### Всевозможные модели спросов
 class demand_function:
@@ -72,35 +72,40 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 100000,
-    "ENV": 100,
+    "T": 10000,
+    "ENV": 1,
     "n": 2,
     "m": 5,
     "delta": 0.95,
     "gamma": 0.5,
-    "c_i": 1,
-    "h_plus": 0,
-    "v_minus": 0,
+    "c_i": 0.25, # 1
+    "h_plus": 1.17498/2, # Из Zhou: примерно половина монопольной цены
+    "v_minus": 1.17498/4, # Из Zhou: примерно четверть монопольной цены
     "eta": 0.05,
     "color": ["#FF7F00", "#1874CD", "#548B54", "#CD2626", "#CDCD00"],
     "profit_dynamic": "compare", # "MA", "real", "compare"
     "loc": "lower left",
     "VISUALIZE_THEORY": True,
-    "VISUALIZE": False,
-    "SAVE": True,
+    "VISUALIZE": True,
+    "SAVE": False,
 }
+
 e2 = {
     "p_inf": e1["c_i"],
-    "p_sup": 2.5,
-    "arms_amo": 101,
+    "p_sup": 2, # 3*e1["c_i"] + e1["h_plus"] + e1["v_minus"], 2.5
+    "arms_amo_price": 51,
+    "arms_amo_inv": 51,
 }
 
 mode = "D"
 
 if mode == "D":
-    prices = np.linspace(e2["p_inf"], e2["p_sup"], e2["arms_amo"])
+    prices = np.linspace(e2["p_inf"], e2["p_sup"], e2["arms_amo_price"])
+    inventory = np.linspace(0, 1, e2["arms_amo_inv"])
 else:
     prices = (e2["p_inf"], e2["p_sup"])
+    inventory = (0, 1)
+
 
 e3 = {
     "demand_params":{
@@ -115,22 +120,47 @@ MEMORY_VOLUME = 1
 own = False
 ONLY_OWN = False
 
+##########################
+### TQL
+##########################
+# e4 = {
+#     "prices": prices,
+#     "firm_model": TQL, # epsilon_greedy
+#     "firm_params": {
+#         "eps": 0.4,
+#         "Q_mat": np.zeros((len(prices)**(MEMORY_VOLUME * (e1["n"] - (1 - int(own)))), len(prices))),
+#         "MEMORY_VOLUME": MEMORY_VOLUME,
+#         "n": e1["n"],
+#         "own": own,
+#         "ONLY_OWN": ONLY_OWN,
+#         "index_list": [x for x in range(len(prices)**MEMORY_VOLUME)],
+#         "action_list": prices,
+#         "delta": e1["delta"],
+#         "alpha": 0.15,
+#         "mode": "zhou", # None, "sanchez_cartas", "zhou"
+#     },
+# }
+##########################
+### TN_DDQN
+##########################
 e4 = {
     "prices": prices,
-    "firm_model": TQL, # epsilon_greedy
+    "inventory": inventory,
+    "firm_model": TN_DDQN,
     "firm_params": {
-        "eps": 0.4,
-        "Q_mat": np.zeros((len(prices)**(MEMORY_VOLUME * (e1["n"] - (1 - int(own)))), len(prices))),
+        "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+        "inventory_actions": inventory,
+        "price_actions": prices,
         "MEMORY_VOLUME": MEMORY_VOLUME,
-        "n": e1["n"],
-        "own": own,
-        "ONLY_OWN": ONLY_OWN,
-        "index_list": [x for x in range(len(prices)**MEMORY_VOLUME)],
-        "action_list": prices,
-        "delta": e1["delta"],
-        "alpha": 0.15,
+        "batch_size": 32, # 32
+        "gamma": e1["delta"],
+        "lr": 0.0001,
+        "eps": 0.4,
         "mode": "zhou", # None, "sanchez_cartas", "zhou"
+        "target_update_freq": e1["T"]//10, # 100
+        "memory_size": 1000, # 10000
     },
+    "own": own,
 }
 
 e5 = {
@@ -139,5 +169,22 @@ e5 = {
 
 Environment = e1 | e2 | e3 | e4 | e5
 
-# a = [1, 2]
-# print(a[:0] + a[1:], a[:1] + a[2:])
+# print(2*0.25 + 1.17498/2 + 1.17498/4)
+
+### Архив возможных параметризаций алгоритмов для фирм:
+
+# mode = None # None, "sanchez_cartas", "zhou"
+
+# firm1 = epsilon_greedy(
+#     eps,
+#     np.zeros(len(prices)),
+#     prices,
+#     mode = mode,
+#     )
+
+# firm2 = epsilon_greedy(
+#     eps,
+#     np.zeros(len(prices)),
+#     prices,
+#     mode = mode,
+#     )
