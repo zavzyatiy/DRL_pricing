@@ -14,6 +14,7 @@ from specification import Environment, demand_function
 
 ### иницализация randomseed
 # random.seed(42)
+# np.random.seed(42)
 # torch.manual_seed(42)
 
 ### количество итераций внутри среды

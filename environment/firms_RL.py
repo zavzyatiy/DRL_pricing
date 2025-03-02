@@ -6,19 +6,26 @@
 
 import numpy as np
 import torch.nn as nn
+import torch
+from torch.distributions.categorical import Categorical
+import torch.nn.functional as F
 import random
 from copy import deepcopy
+from collections import deque
 
 # random.seed(42)
+# np.random.seed(42)
 # torch.manual_seed(42)
 
 """
 ##################################################
 Code for TN_DDQN is a custom version of 00ber implementation of DQN.
 Orginal: https://github.com/00ber/Deep-Q-Networks/blob/main/src/airstriker-genesis/agent.py
+Also important for invalid action masking: https://github.com/vwxyzjn/invalid-action-masking/blob/master/ppo.py
 ##################################################
 """
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class epsilon_greedy:
      
@@ -190,6 +197,146 @@ class TQL:
             self.Q_mat = Q
 
 
+
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+class CategoricalMasked(Categorical):
+    def __init__(self, logits, masks):
+        self.masks = masks.bool().to(device)
+        logits = torch.where(self.masks, logits, torch.tensor(-1e8, device=device))
+        super().__init__(logits=logits)
+
+
+class CustomNet(nn.Module):
+    def __init__(self, input_dim, n_stock_actions, n_price_actions):
+        super().__init__()
+        self.shared_net = nn.Sequential(
+            nn.Linear(input_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, 256),
+            nn.ReLU()
+        )
+        self.head_stock = nn.Linear(256, n_stock_actions)  # Логиты для выбора запаса
+        self.head_price = nn.Linear(256, n_price_actions)  # Логиты для выбора цены
+
+    def forward(self, x):
+        x = self.shared_net(x)
+        stock_logits = self.head_stock(x)
+        price_logits = self.head_price(x)
+        return stock_logits, price_logits
+
+
+class InventoryAgent:
+
+
+    def __init__(
+        self,
+        state_dim,
+        stock_actions,
+        price_actions,
+        c_i,
+        p_max,
+        gamma=0.9,
+        batch_size=64,
+        memory_size=10000
+    ):
+        self.stock_actions = np.array(stock_actions)  # Допустимые уровни запасов
+        self.price_actions = np.array(price_actions)  # Допустимые цены
+        self.c_i = c_i
+        self.p_max = p_max
+        self.gamma = gamma
+        self.batch_size = batch_size
+
+        # Инициализация нейросетей
+        self.net = CustomNet(state_dim, len(stock_actions), len(price_actions)).to(device)
+        self.target_net = deepcopy(self.net)
+        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=1e-4)
+
+        # Replay buffer
+        self.memory = deque(maxlen=memory_size)
+
+
+    def get_masks(self, current_stock):
+        """Генерация масок для запасов и цен."""
+        # Маска для запасов: только значения > current_stock
+        stock_mask = torch.tensor(self.stock_actions > current_stock, device=device)
+        
+        # Маска для цен: значения в [c_i, p_max]
+        price_mask = torch.tensor(
+            (self.price_actions >= self.c_i) & (self.price_actions <= self.p_max),
+            device=device
+        )
+        return stock_mask, price_mask
+
+
+    def act(self, state, current_stock):
+        """Выбор действия с учетом масок."""
+        state_tensor = torch.FloatTensor(state).unsqueeze(0).to(device)
+        
+        with torch.no_grad():
+            stock_logits, price_logits = self.net(state_tensor)
+            stock_mask, price_mask = self.get_masks(current_stock)
+            
+            # Применение масок
+            stock_dist = CategoricalMasked(stock_logits, stock_mask)
+            price_dist = CategoricalMasked(price_logits, price_mask)
+            
+            stock_idx = stock_dist.sample().item()
+            price_idx = price_dist.sample().item()
+
+        return (
+            self.stock_actions[stock_idx],  # Выбранный запас
+            self.price_actions[price_idx]    # Выбранная цена
+        )
+
+
+    def cache(self, state, action_stock, action_price, reward, next_state):
+        """Сохранение опыта в replay buffer"""
+        state = torch.FloatTensor(state)
+        next_state = torch.FloatTensor(next_state)
+        self.memory.append((state, action_stock, action_price, reward, next_state))
+
+
+    def learn(self):
+        """Обновление нейросети на основе replay buffer."""
+        if len(self.memory) < self.batch_size:
+            return
+
+        # Формирование батча
+        batch = random.sample(self.memory, self.batch_size)
+        states, stock_acts, price_acts, rewards, next_states = zip(*batch)
+        
+        # Конвертация в тензоры
+        states = torch.stack(states).to(device)
+        next_states = torch.stack(next_states).to(device)
+        rewards = torch.FloatTensor(rewards).to(device)
+        
+        # Q-значения для текущих действий
+        stock_logits, price_logits = self.net(states)
+        stock_q = stock_logits.gather(1, torch.LongTensor(stock_acts).view(-1, 1).to(device))
+        price_q = price_logits.gather(1, torch.LongTensor(price_acts).view(-1, 1).to(device))
+        q_values = stock_q + price_q
+
+        # Целевые Q-значения
+        with torch.no_grad():
+            next_stock_logits, next_price_logits = self.target_net(next_states)
+            next_q = next_stock_logits.max(1)[0] + next_price_logits.max(1)[0]
+            target_q = rewards + self.gamma * next_q
+
+        # Обучение
+        loss = torch.nn.functional.mse_loss(q_values, target_q.unsqueeze(1))
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+
+    def update_target_net(self):
+        """Синхронизация целевой сети."""
+        self.target_net.load_state_dict(self.net.state_dict())
+
+
+
 class DQN(nn.Module):
     """
     mini cnn structure
@@ -258,3 +405,34 @@ class TN_DDQN:
 #     prices,
 #     mode = mode,
 #     )
+
+# Допустимые действия
+stock_actions = [50, 60, 70, 80]  # Уровни запасов
+price_actions = [10, 20, 30, 40]  # Цены
+# stock_actions = np.array(stock_actions)/100
+
+
+# Инициализация агента
+agent = InventoryAgent(
+    state_dim=4,  # Размер состояния (например: текущий запас, последние 3 цены)
+    stock_actions=stock_actions,
+    price_actions=price_actions,
+    c_i=15,       # Минимальная цена
+    p_max=40,
+    gamma=0.95
+)
+
+# Пример взаимодействия со средой
+state = [70, 20, 25, 30]  # Текущее состояние: запас=70, последние цены=[20,25,30]
+current_stock = 70
+
+# Выбор действия
+next_stock, next_price = agent.act(state, current_stock)
+print(f"Выбрано: запас={next_stock}, цена={next_price}")  # Например: 80, 20
+
+# Обучение агента
+agent.cache(state, next_stock, next_price, reward=10.5, next_state=[next_stock, 20, 25, 30])
+agent.learn()
+agent.update_target_net()
+
+print(device)
