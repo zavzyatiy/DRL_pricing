@@ -72,15 +72,15 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 10000,
-    "ENV": 1,
+    "T": 5000,
+    "ENV": 40,
     "n": 2,
     "m": 5,
     "delta": 0.95,
     "gamma": 0.5,
     "c_i": 0.25, # 1
-    "h_plus": 1.17498/2, # Из Zhou: примерно половина монопольной цены
-    "v_minus": 1.17498/4, # Из Zhou: примерно четверть монопольной цены
+    "h_plus": 1.17498/2, # 1.17498/2, # Из Zhou: примерно половина монопольной цены
+    "v_minus": 1.17498/4, # 1.17498/4, # Из Zhou: примерно четверть монопольной цены
     "eta": 0.05,
     "color": ["#FF7F00", "#1874CD", "#548B54", "#CD2626", "#CDCD00"],
     "profit_dynamic": "compare", # "MA", "real", "compare"
@@ -93,8 +93,8 @@ e1 = {
 e2 = {
     "p_inf": e1["c_i"],
     "p_sup": 2, # 3*e1["c_i"] + e1["h_plus"] + e1["v_minus"], 2.5
-    "arms_amo_price": 51,
-    "arms_amo_inv": 51,
+    "arms_amo_price": 31,
+    "arms_amo_inv": 31,
 }
 
 mode = "D"
@@ -157,8 +157,8 @@ e4 = {
         "lr": 0.0001,
         "eps": 0.4,
         "mode": "zhou", # None, "sanchez_cartas", "zhou"
-        "target_update_freq": e1["T"]//10, # 100
-        "memory_size": 1000, # 10000
+        "target_update_freq": e1["T"]//100, # 100
+        "memory_size": 10000, # 10000
     },
     "own": own,
 }

@@ -116,7 +116,7 @@ for env in range(ENV):
     if TN_DDQN == 1:
         x_t = [0 for i in range(n)]
     
-    ### Инициализация памяти платформы
+    ### Инициализация платформы
     # -
     
     ### Инициализация памяти в отзывах
@@ -231,12 +231,12 @@ for env in range(ENV):
                 idxs.append(idxs_i)
 
             learn = mem.copy()
-            # print("MEM", mem)
+
             if len(learn) < MEMORY_VOLUME:
                 learn.append([x[1] for x in idxs])
             else:
                 learn = learn[1:] + [[x[1] for x in idxs]]
-            # print("LEARN", learn)
+            
             inv = []
             p = []
             for i in range(n):
@@ -443,12 +443,12 @@ if VISUALIZE or SAVE:
 Price_history = np.array(Price_history)
 Profit_history = np.array(Profit_history)
 
-print("Средняя цена по всем раундам:", " ".join([str(round(np.mean(Price_history[:, i]), 3)) for i in range(n)]))
-print("Средняя прибыль по всем раундам:", " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)]))
+print(f"Средняя цена по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Price_history[:, i]), 3)) for i in range(n)]))
+print(f"Средняя прибыль по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)]))
 
 if TN_DDQN == 1:
     Stock_history = np.array(Stock_history)
-    print("Среднии запасы по всем раундам:", " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)]))
+    print(f"Среднии запасы по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)]))
 
 print("-"*20*n)
 print("Теоретические цены:", round(p_NE , 3), round(p_M , 3))
@@ -472,4 +472,19 @@ n = 2, ENV = 100, T = 100000, mode = "zhou", MEMORY_VOLUME = 1, own = False
 Средняя цена по всем раундам: 1.7535228999999999 1.7510052999999999 1.7533135
 Средняя прибыль по всем раундам: 0.12345687961002637 0.12364908988203568 0.12292997137728587
 n = 3, eps = 0.9, ENV = 100, T = 100000, mode = "zhou", MEMORY_VOLUME = 1, own = False
+
+T = 10000, ENV = 40
+Средняя цена по всем раундам: 0.926 0.975
+Средняя прибыль по всем раундам: 0.173 0.134
+Среднии запасы по всем раундам: 0.476 0.466
+----------------------------------------
+Теоретические цены: 0.723 1.175
+Теоретические прибыли: 0.223 0.337
+Теоретические инв. в запасы: 0.471 0.365
+----------------------------------------
+Индекс сговора по цене: 50.37%
+Индекс сговора по прибыли: -60.34%
+Индекс сговора по запасам: 0.35%
+
+
 """

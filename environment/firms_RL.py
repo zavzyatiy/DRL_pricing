@@ -261,15 +261,23 @@ class TN_DDQN:
             mode: str,
             target_update_freq: int,
             memory_size: int,
+            cuda_usage = False,
             ):
         
         self.state_dim = state_dim
         self.inventory_actions = inventory_actions
         self.price_actions = price_actions
-        
+        self.cuda_usage = cuda_usage
+        if cuda_usage:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         # Q-network
         self.online = DQNet(state_dim, inventory_actions, price_actions)
         self.target_net = deepcopy(self.online)
+
+        if cuda_usage:
+            self.online = DQNet(state_dim, inventory_actions, price_actions).to(self.device)
+            self.target_net = deepcopy(self.online).to(self.device)
         
         # Hyperparameters
         self.batch_size = batch_size
@@ -281,9 +289,9 @@ class TN_DDQN:
         if mode == "sanchez_cartas":
             self.beta = 1.5/(10**4)
         elif mode == "zhou":
-            self.eps_min = 0.025
+            self.eps_min = 0.01
             self.eps_max = 1
-            self.beta = 1.5/(10**4)
+            self.beta = 0.005 # 1.5/(10**4)
         
         self.target_update_freq = target_update_freq
         self.memory = deque(maxlen=memory_size)
@@ -297,7 +305,10 @@ class TN_DDQN:
         """Преобразует состояние фирмы в тензор"""
         inventory = firm_state['current_inventory']
         comp_prices = np.array(firm_state['competitors_prices']).flatten()
-        return torch.FloatTensor([inventory] + comp_prices.tolist())
+        if not self.cuda_usage:
+            return torch.FloatTensor([inventory] + comp_prices.tolist())
+        else:
+            return torch.FloatTensor([inventory] + comp_prices.tolist()).to(self.device)
 
 
     def suggest_actions(self, firm_state):
@@ -336,23 +347,38 @@ class TN_DDQN:
         next_vec = self._get_state_vector(next_state)
         
         if len(state_vec) == self.state_dim:
-            self.memory.append((
-                state_vec,
-                actions,
-                reward,
-                next_vec,
-            ))
+            if not self.cuda_usage:
+                self.memory.append((
+                    state_vec,
+                    actions,
+                    reward,
+                    next_vec,
+                ))
+            else:
+                self.memory.append((
+                    state_vec.cpu(),  # Храним в CPU памяти
+                    actions,
+                    torch.FloatTensor([reward]).to(self.device),
+                    next_vec.cpu()
+                ))
 
 
     def _update_model(self):
         if len(self.memory) < self.batch_size:
             return 0.0
-
-        batch = random.sample(self.memory, self.batch_size)
-        states = torch.stack([x[0] for x in batch])
-        actions = torch.LongTensor([x[1] for x in batch])
-        rewards = torch.FloatTensor([x[2] for x in batch])
-        next_states = torch.stack([x[3] for x in batch])
+        
+        if not self.cuda_usage:
+            batch = random.sample(self.memory, self.batch_size)
+            states = torch.stack([x[0] for x in batch])
+            actions = torch.LongTensor([x[1] for x in batch])
+            rewards = torch.FloatTensor([x[2] for x in batch])
+            next_states = torch.stack([x[3] for x in batch])
+        else:
+            batch = random.sample(self.memory, self.batch_size)
+            states = torch.stack([x[0].to(self.device) for x in batch])
+            actions = torch.LongTensor([x[1] for x in batch]).to(self.device)
+            rewards = torch.stack([x[2].to(self.device) for x in batch])
+            next_states = torch.stack([x[3].to(self.device) for x in batch])
 
         # Current Q values (online network)
         inv_q_online, price_q_online = self.online(states, 'online')
