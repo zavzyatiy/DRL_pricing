@@ -72,8 +72,8 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 5000,
-    "ENV": 40,
+    "T": 10000,
+    "ENV": 50,
     "n": 2,
     "m": 5,
     "delta": 0.95,
