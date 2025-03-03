@@ -382,12 +382,25 @@ class TN_DDQN:
 
         # Current Q values (online network)
         inv_q_online, price_q_online = self.online(states, 'online')
+
+        if not self.cuda_usage:
+            inventory_actions_tensor = torch.tensor(self.inventory_actions)
+        else:
+            inventory_actions_tensor = torch.tensor(self.inventory_actions).to(self.device)
+        
+        mask = inventory_actions_tensor.unsqueeze(0) < states[:, 0].unsqueeze(1)
+        inv_q_online[mask] = -float('inf')
+        
         inv_selected = inv_q_online.gather(1, actions[:, 0].unsqueeze(1))
         price_selected = price_q_online.gather(1, actions[:, 1].unsqueeze(1))
 
         # Target Q values (target network)
         with torch.no_grad():
             inv_q_target, price_q_target = self.target_net(next_states, 'target')
+            
+            mask_target = inventory_actions_tensor.unsqueeze(0) < next_states[:, 0].unsqueeze(1)
+            inv_q_target[mask_target] = -float('inf')
+
             inv_max = inv_q_target.max(1)[0]
             price_max = price_q_target.max(1)[0]
             targets = rewards + self.gamma * (inv_max + price_max)

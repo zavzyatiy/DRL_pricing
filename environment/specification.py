@@ -73,7 +73,7 @@ class demand_function:
 
 e1 = {
     "T": 10000,
-    "ENV": 50,
+    "ENV": 10,
     "n": 2,
     "m": 5,
     "delta": 0.95,

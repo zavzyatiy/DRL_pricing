@@ -442,12 +442,15 @@ if VISUALIZE or SAVE:
 
 Price_history = np.array(Price_history)
 Profit_history = np.array(Profit_history)
+# print(Price_history)
+# print(Profit_history)
 
 print(f"Средняя цена по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Price_history[:, i]), 3)) for i in range(n)]))
 print(f"Средняя прибыль по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)]))
 
 if TN_DDQN == 1:
     Stock_history = np.array(Stock_history)
+    # print(Stock_history)
     print(f"Среднии запасы по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)]))
 
 print("-"*20*n)
@@ -486,5 +489,15 @@ T = 10000, ENV = 40
 Индекс сговора по прибыли: -60.34%
 Индекс сговора по запасам: 0.35%
 
-
+Средняя цена по последним 5000 раундов: 0.954 0.933
+Средняя прибыль по последним 5000 раундов: 0.291 0.304
+Среднии запасы по последним 5000 раундов: 0.244 0.274
+----------------------------------------
+Теоретические цены: 0.723 1.175
+Теоретические прибыли: 0.223 0.337
+Теоретические инв. в запасы: 0.471 0.365
+----------------------------------------
+Индекс сговора по цене: 48.7%
+Индекс сговора по прибыли: 64.98%
+Индекс сговора по запасам: 199.09%
 """
