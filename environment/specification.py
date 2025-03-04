@@ -4,7 +4,7 @@
 
 import random
 import numpy as np
-# import torch
+import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
@@ -37,14 +37,20 @@ class demand_function:
         assert len(prices) == self.n, f"Demand is built for n = {self.n}, not for {len(prices)}"
 
         if self.mode == "logit":
-            s = list(prices)
+            # s = list(prices)
             if self.a:
-                exp_s = [1] + [np.exp((self.a - x)/self.mu) for x in s]
+                s = np.concatenate(([self.a], prices))
+                # exp_s = [1] + [np.exp((self.a - x)/self.mu) for x in s]
+                exp_s = np.exp((self.a - s)/self.mu)
             else:
-                exp_s = [1] + [np.exp(-x) for x in s]
+                s = np.concatenate(([0], prices))
+                # exp_s = [1] + [np.exp(-x) for x in s]
+                exp_s = np.exp((self.a - s)/self.mu)
             
-            sum_exp = sum(exp_s)
-            return [x/sum_exp for x in exp_s[1:]]
+            sum_exp = np.sum(exp_s)
+            # return [x/sum_exp for x in exp_s[1:]]
+            res = exp_s/sum_exp
+            return res[1:]
     
     def get_theory(self, c_i):
         precision = 0.0001
@@ -72,15 +78,15 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 1000,
+    "T": 10000,
     "ENV": 1,
     "n": 2,
     "m": 5,
     "delta": 0.95,
     "gamma": 0.5,
     "c_i": 0.25, # 0.25, 1
-    "h_plus": 1.17498, # 1.17498/2, # Из Zhou: примерно половина монопольной цены
-    "v_minus": 1.17498, # 1.17498/4, # Из Zhou: примерно четверть монопольной цены
+    "h_plus": 1.17498/2, # 1.17498/2, # Из Zhou: примерно половина монопольной цены
+    "v_minus": 1.17498/4, # 1.17498/4, # Из Zhou: примерно четверть монопольной цены
     "eta": 0.05,
     "color": ["#FF7F00", "#1874CD", "#548B54", "#CD2626", "#CDCD00"],
     "profit_dynamic": "compare", # "MA", "real", "compare"
@@ -153,12 +159,12 @@ e4 = {
         "inventory_actions": inventory,
         "price_actions": prices,
         "MEMORY_VOLUME": MEMORY_VOLUME,
-        "batch_size": 128, # 32
+        "batch_size": 256, # 32
         "gamma": e1["delta"],
         "lr": 0.0001,
         "eps": 0.4,
         "mode": "zhou", # None, "sanchez_cartas", "zhou"
-        "target_update_freq": e1["T"]//100, # e1["T"]//100, 100
+        "target_update_freq": 1, # e1["T"]//100, 100
         "memory_size": 1000, # 10000
     },
     "own": own,
@@ -190,5 +196,5 @@ Environment = e1 | e2 | e3 | e4 | e5
 #     mode = mode,
 #     )
 
-bbb = np.array([1, 2, 3])
-print(np.concatenate(([0], bbb)))
+# bbb = np.array([[1, 2, 3], [4, 5, 6]])
+# print(np.maximum(0, bbb - 3 * np.ones((2, 3))))

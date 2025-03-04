@@ -113,7 +113,7 @@ for env in range(ENV):
     mem = []
 
     if TN_DDQN == 1:
-        x_t = [0 for i in range(n)]
+        x_t = np.array([0 for i in range(n)])
     
     ### Инициализация платформы
     # -
@@ -238,24 +238,34 @@ for env in range(ENV):
             
             inv = np.array([inventory[x[0]] for x in idxs])
             p = np.array([prices[x[1]] for x in idxs])
-            # inv = []
-            # p = []
-            # for i in range(n):
-            #     # if inventory[idxs[i][0]] >= x_t[i]:
-            #     #     inv.append(inventory[idxs[i][0]])
-            #     # else:
-            #     #     print("!!!")
-            #     #     inv.append(x_t[i])
-                
-            #     p.append(prices[idxs[i][1]])
-            #     inv.append(inventory[idxs[i][0]])
 
             doli = spros.distribution(p)
 
-            pi = []
-            for i in range(n):
-                pi_i = p[i] * doli[i] - c_i * (inv[i] - x_t[i]) - h_plus * max(0, inv[i] - doli[i]) - v_minus * min(0, doli[i] - inv[i])
-                pi.append(pi_i)
+            # pi = []
+            # pi_inv = []
+            # pi_price = []
+            # for i in range(n):
+                # pi_i = p[i] * doli[i] - c_i * (inv[i] - x_t[i]) - h_plus * max(0, inv[i] - doli[i]) - v_minus * min(0, doli[i] - inv[i])
+                # pi.append(pi_i)
+                # pi_inv_i = - c_i * (inv[i] - x_t[i]) - h_plus * max(0, inv[i] - doli[i]) - v_minus * min(0, doli[i] - inv[i])
+                # pi_price_i = p[i] * doli[i]
+                # pi_inv.append(pi_inv_i)
+                # pi_price.append(pi_price_i)
+            # print(inv - doli)
+
+            pi = p * doli - c_i * (inv - np.array(x_t)) - h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
+
+            # print("Цены", p)
+            # print("Инв", inv)
+            # print("Было", x_t)
+            # print("Доли", doli)
+            # print("-"*100)
+            # print(p * doli)
+            # print(- c_i * (inv - np.array(x_t)))
+            # print("Вообще", inv - doli)
+            # print(- h_plus * np.maximum(0, inv - doli))
+            # print(v_minus * np.minimum(0, inv - doli))
+            # print("#"*100)
 
             if len(learn) == MEMORY_VOLUME:
                 for i in range(n):
@@ -280,9 +290,11 @@ for env in range(ENV):
                     }
 
                     firms[i].cache_experience(prev_state, idxs[i], pi[i], new_state)
+                    # firms[i].cache_experience(prev_state, idxs[i], (pi_inv[i], pi_price[i]), new_state)
 
-            for i in range(n):
-                x_t[i] = max(0, inv[i] - doli[i])
+            # for i in range(n):
+            #     x_t[i] = max(0, inv[i] - doli[i])
+            x_t = np.maximum(0, inv - doli)
 
             for i in range(n):
                 firms[i].update()
@@ -306,7 +318,8 @@ for env in range(ENV):
 
 if VISUALIZE or SAVE:
 
-    profit_dynamic = TN_DDQN * "MA" + (1 - TN_DDQN) * profit_dynamic
+    sgladit = int(0.05 * T) # int(0.05 * T)
+    # profit_dynamic = TN_DDQN * "MA" + (1 - TN_DDQN) * profit_dynamic
     fig, ax = plt.subplots(1 + TN_DDQN, 2 + (1 - TN_DDQN) * int(profit_dynamic == "compare"), figsize= (20, 5*(1 + TN_DDQN*1.1)))
 
     if TN_DDQN == 0:
@@ -322,11 +335,13 @@ if VISUALIZE or SAVE:
             plotThird = ax[1][1]
 
     ### Усреднение динамики цены
-    window_size = int(0.05*T)
+    window_size = sgladit
     kernel = np.ones(window_size) / window_size
 
     for i in range(n):
         mv = np.convolve(raw_price_history[:, i], kernel, mode='valid')
+        # print("ПРОВЕРКА НА АДЕКВАТНОСТЬ")
+        # print(raw_price_history[:, i], mv)
         
         if profit_dynamic == "real" or profit_dynamic == "compare":
             if i == 0:
@@ -350,7 +365,7 @@ if VISUALIZE or SAVE:
 
     if TN_DDQN == 1:
         ### Усреднение динамики запасов
-        window_size = int(0.05*T)
+        window_size = sgladit
         kernel = np.ones(window_size) / window_size
 
         for i in range(n):
@@ -358,11 +373,11 @@ if VISUALIZE or SAVE:
             
             if profit_dynamic == "real" or profit_dynamic == "compare":
                 if i == 0:
-                    all_mv = mv.copy()
-                    all_mv = all_mv.reshape(-1, 1)
+                    all_inv = mv.copy()
+                    all_inv = all_inv.reshape(-1, 1)
                 else:
                     mv = mv.reshape(-1, 1)
-                    all_mv = np.hstack((all_mv, mv))
+                    all_inv = np.hstack((all_inv, mv))
             
             plotStock.plot(mv, c = color[i], label = f"Фирма {i + 1}") # , linewidth= 0.2)
         
@@ -378,7 +393,7 @@ if VISUALIZE or SAVE:
 
     if profit_dynamic == "MA" or profit_dynamic == "compare":
         ### Усреднение динамики прибыли
-        window_size = int(0.05*T)
+        window_size = sgladit
         kernel = np.ones(window_size) / window_size
 
         for i in range(n):
@@ -399,14 +414,29 @@ if VISUALIZE or SAVE:
         a = Environment["demand_params"]["a"]
         mu = Environment["demand_params"]["mu"]
 
-        zeros_column = a * np.ones((all_mv.shape[0], 1), dtype=all_mv.dtype)
-        all_d = np.hstack((zeros_column, all_mv))
-        all_d = np.exp((a-all_d)/mu)
-        s = np.sum(all_d, axis = 1)
-        all_d = all_d / s[:, np.newaxis]
-        all_d = all_d[:, 1:]
-        c = c_i * np.ones(all_mv.shape)
-        smoothed_pi = (all_mv - c) * all_d
+        if TN_DDQN == 0:
+            zeros_column = a * np.ones((all_mv.shape[0], 1), dtype=all_mv.dtype)
+            all_d = np.hstack((zeros_column, all_mv))
+            all_d = np.exp((a-all_d)/mu)
+            s = np.sum(all_d, axis = 1)
+            all_d = all_d / s[:, np.newaxis]
+            all_d = all_d[:, 1:]
+            c = c_i * np.ones(all_mv.shape)
+            smoothed_pi = (all_mv - c) * all_d
+        else:
+            zeros_column = a * np.ones((all_mv.shape[0], 1), dtype=all_mv.dtype)
+            all_d = np.hstack((zeros_column, all_mv))
+            all_d = np.exp((a-all_d)/mu)
+            s = np.sum(all_d, axis = 1)
+            all_d = all_d / s[:, np.newaxis]
+            all_d = all_d[:, 1:]
+            stocks = np.concatenate((np.array([[0, 0]]), np.maximum(0, all_inv - all_d)))[:-1]
+            smoothed_pi = all_mv * all_d - c_i * (all_inv - stocks) - h_plus * np.maximum(0, all_inv - all_d) + v_minus * np.minimum(0, all_inv - all_d)
+            # print("-"*100)
+            # print(all_mv * all_d)
+            # print(- c_i * (all_inv - stocks))
+            # print(- h_plus * np.maximum(0, all_inv - all_d))
+            # print(v_minus * np.minimum(0, all_inv - all_d))
 
         for i in range(n):
             mv = smoothed_pi[:, i]
@@ -430,7 +460,7 @@ if VISUALIZE or SAVE:
                 plotThird.plot([pi_M]*len(mv), c = "#6C7B8B", linestyle = "--")
 
             plotThird.set_title("Динамика прибылей")
-            plotThird.set_ylabel(f'Прибыль по сглаженной цене')
+            plotThird.set_ylabel(f'Прибыль по сглаженной цене' + TN_DDQN*" и запасам")
             plotThird.set_xlabel('Итерация')
             plotThird.legend(loc = loc)
     
@@ -481,11 +511,12 @@ if SUMMARY:
 Средняя прибыль по всем раундам: 0.261182733098004 0.2620053694533933
 n = 2, ENV = 100, T = 100000, mode = "zhou", MEMORY_VOLUME = 1, own = False
 
+
 Средняя цена по всем раундам: 1.7535228999999999 1.7510052999999999 1.7533135
 Средняя прибыль по всем раундам: 0.12345687961002637 0.12364908988203568 0.12292997137728587
 n = 3, eps = 0.9, ENV = 100, T = 100000, mode = "zhou", MEMORY_VOLUME = 1, own = False
 
-T = 10000, ENV = 30, h_plus = 1.17498, v_minus = 1.17498, n = 2, arms = 21 (оба), batch_size = 128
+
 Средняя цена по последним 500 раундов: 0.858 0.837
 Средняя прибыль по последним 500 раундов: 0.24 0.265
 Среднии запасы по последним 500 раундов: 0.467 0.402
@@ -497,4 +528,18 @@ T = 10000, ENV = 30, h_plus = 1.17498, v_minus = 1.17498, n = 2, arms = 21 (об
 Индекс сговора по цене: 27.59%
 Индекс сговора по прибыли: 25.81%
 Индекс сговора по запасам: 34.82%
+T = 10000, ENV = 30, h_plus = 1.17498, v_minus = 1.17498, n = 2, arms = 21 (оба), batch_size = 128
+
+
+Средняя цена по последним 500 раундов: 0.827 0.831
+Среднии запасы по последним 500 раундов: 0.541 0.55
+Средняя прибыль по последним 500 раундов: -0.171 -0.167
+----------------------------------------
+Теоретические цены: 0.723 1.175
+Теоретические инв. в запасы: 0.471 0.365
+Теоретические прибыли: 0.223 0.337
+----------------------------------------
+Индекс сговора по цене: 23.51%
+Индекс сговора по запасам: -69.63%
+Индекс сговора по прибыли: -342.05%
 """
