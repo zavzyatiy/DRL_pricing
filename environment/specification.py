@@ -72,13 +72,13 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 10000,
-    "ENV": 30,
+    "T": 1000,
+    "ENV": 1,
     "n": 2,
     "m": 5,
     "delta": 0.95,
     "gamma": 0.5,
-    "c_i": 0.25, # 1
+    "c_i": 0.25, # 0.25, 1
     "h_plus": 1.17498, # 1.17498/2, # Из Zhou: примерно половина монопольной цены
     "v_minus": 1.17498, # 1.17498/4, # Из Zhou: примерно четверть монопольной цены
     "eta": 0.05,
@@ -189,3 +189,6 @@ Environment = e1 | e2 | e3 | e4 | e5
 #     prices,
 #     mode = mode,
 #     )
+
+bbb = np.array([1, 2, 3])
+print(np.concatenate(([0], bbb)))

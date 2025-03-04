@@ -268,6 +268,7 @@ class TN_DDQN:
         self.inventory_actions = inventory_actions
         self.price_actions = price_actions
         self.cuda_usage = cuda_usage
+
         if cuda_usage:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -294,7 +295,9 @@ class TN_DDQN:
             self.beta = 1.5/(10**4) # 0.005, 1.5/(10**3), 1.5/(10**4)
         
         self.target_update_freq = target_update_freq
-        self.memory = deque(maxlen=memory_size)
+        # self.memory = deque(maxlen=memory_size)
+        self.memory_size = memory_size
+        self.memory = []
         
         self.optimizer = torch.optim.Adam(self.online.parameters(), lr=lr)
 
@@ -333,7 +336,7 @@ class TN_DDQN:
                 if not self.cuda_usage:
                     inventory_actions_tensor = torch.tensor(self.inventory_actions)
                 else:
-                    inventory_actions_tensor = torch.tensor(self.inventory_actions).to(self.device)
+                    inventory_actions_tensor = torch.tensor(self.inventory_actions, dtype = torch.float16).to(self.device)
                 
                 mask = inventory_actions_tensor.unsqueeze(0) < state[0]
                 inv_q[mask] = -float('inf')
@@ -356,6 +359,25 @@ class TN_DDQN:
         """Сохраняет опыт в replay buffer"""
         state_vec = self._get_state_vector(state)
         next_vec = self._get_state_vector(next_state)
+        
+        # if len(state_vec) == self.state_dim:
+        #     if not self.cuda_usage:
+        #         self.memory.append((
+        #             state_vec,
+        #             actions,
+        #             reward,
+        #             next_vec,
+        #         ))
+        #     else:
+        #         self.memory.append((
+        #             state_vec.cpu(),  # Храним в CPU памяти
+        #             actions,
+        #             torch.FloatTensor([reward]).to(self.device),
+        #             next_vec.cpu()
+        #         ))
+
+        if len(self.memory) >= self.memory_size:
+            self.memory.pop(0)
         
         if len(state_vec) == self.state_dim:
             if not self.cuda_usage:
@@ -386,10 +408,10 @@ class TN_DDQN:
             next_states = torch.stack([x[3] for x in batch])
         else:
             batch = random.sample(self.memory, self.batch_size)
-            states = torch.stack([x[0].to(self.device) for x in batch])
+            states = torch.stack([x[0] for x in batch]).to(self.device)
             actions = torch.LongTensor([x[1] for x in batch]).to(self.device)
-            rewards = torch.stack([x[2].to(self.device) for x in batch])
-            next_states = torch.stack([x[3].to(self.device) for x in batch])
+            rewards = torch.stack([x[2] for x in batch]).to(self.device)
+            next_states = torch.stack([x[3] for x in batch]).to(self.device)
 
         # Current Q values (online network)
         inv_q_online, price_q_online = self.online(states, 'online')
@@ -420,11 +442,15 @@ class TN_DDQN:
             inv_max = torch.gather(inv_q_target, 1, inv_argmax.unsqueeze(1)).squeeze()
             price_max = torch.gather(price_q_target, 1, price_argmax.unsqueeze(1)).squeeze()
 
-            targets = rewards + self.gamma * (inv_max + price_max)
+            # targets = rewards + self.gamma * (inv_max + price_max)
+            targets_inv = rewards + self.gamma * (inv_max)
+            targets_price = rewards + self.gamma * (price_max)
 
         # Loss calculation
-        loss_inv = F.mse_loss(inv_selected.squeeze(), targets)
-        loss_price = F.mse_loss(price_selected.squeeze(), targets)
+        # loss_inv = F.mse_loss(inv_selected.squeeze(), targets)
+        # loss_price = F.mse_loss(price_selected.squeeze(), targets)
+        loss_inv = F.mse_loss(inv_selected.squeeze(), targets_inv)
+        loss_price = F.mse_loss(price_selected.squeeze(), targets_price)
         total_loss = loss_inv + loss_price
 
         # Optimize

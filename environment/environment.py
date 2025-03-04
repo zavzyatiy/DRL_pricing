@@ -236,8 +236,8 @@ for env in range(ENV):
             else:
                 learn = learn[1:] + [[x[1] for x in idxs]]
             
-            inv = [inventory[x[0]] for x in idxs]
-            p = [prices[x[1]] for x in idxs]
+            inv = np.array([inventory[x[0]] for x in idxs])
+            p = np.array([prices[x[1]] for x in idxs])
             # inv = []
             # p = []
             # for i in range(n):
@@ -444,6 +444,7 @@ if VISUALIZE or SAVE:
 
 
 if SUMMARY:
+    print("\n")
     Price_history = np.array(Price_history)
     Profit_history = np.array(Profit_history)
     # print(Price_history)
