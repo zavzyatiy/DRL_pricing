@@ -433,11 +433,13 @@ class TN_DDQN:
             # targets_price = rewards[:, 1] + self.gamma * (price_max)
 
         # Loss calculation
-        loss_inv = F.mse_loss(inv_selected.squeeze(), targets)
-        loss_price = F.mse_loss(price_selected.squeeze(), targets)
-        # loss_inv = F.mse_loss(inv_selected.squeeze(), targets_inv)
-        # loss_price = F.mse_loss(price_selected.squeeze(), targets_price)
-        total_loss = loss_inv + loss_price
+        # loss_inv = F.mse_loss(inv_selected.squeeze(), targets)
+        # loss_price = F.mse_loss(price_selected.squeeze(), targets)
+        ## loss_inv = F.mse_loss(inv_selected.squeeze(), targets_inv)
+        ## loss_price = F.mse_loss(price_selected.squeeze(), targets_price)
+        # total_loss = loss_inv + loss_price
+        
+        total_loss = F.mse_loss(inv_selected.squeeze() + price_selected.squeeze(), targets)
 
         # Optimize
         self.optimizer.zero_grad()

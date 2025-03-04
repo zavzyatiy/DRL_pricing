@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from copy import deepcopy
 
-from firms_RL import epsilon_greedy, TQL
+# from firms_RL import epsilon_greedy, TQL
 from specification import Environment, demand_function
 
 ### иницализация randomseed

@@ -159,12 +159,12 @@ e4 = {
         "inventory_actions": inventory,
         "price_actions": prices,
         "MEMORY_VOLUME": MEMORY_VOLUME,
-        "batch_size": 256, # 32
+        "batch_size": 32, # 32
         "gamma": e1["delta"],
         "lr": 0.0001,
         "eps": 0.4,
         "mode": "zhou", # None, "sanchez_cartas", "zhou"
-        "target_update_freq": 1, # e1["T"]//100, 100
+        "target_update_freq": 100, # e1["T"]//100, 100
         "memory_size": 1000, # 10000
     },
     "own": own,
