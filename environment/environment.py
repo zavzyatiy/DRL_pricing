@@ -66,6 +66,8 @@ VISUALIZE = Environment["VISUALIZE"]
 VISUALIZE_THEORY = Environment["VISUALIZE_THEORY"]
 # Сохранить итоговоый график?
 SAVE = Environment["SAVE"]
+# Выводить итоговую информацию о симуляциях?
+SUMMARY = Environment["SUMMARY"]
 # С какой стороны отображать легенду на графиках
 loc = Environment["loc"]
 
@@ -105,9 +107,6 @@ for env in range(ENV):
         raw_stock_history = []
 
     ### Инициализация однородных фирм
-
-    # M = Environment["firm_model"]
-    # firm_params = Environment["firm_params"]
 
     firms = [deepcopy(M(**firm_params)) for i in range(n)]
 
@@ -237,21 +236,25 @@ for env in range(ENV):
             else:
                 learn = learn[1:] + [[x[1] for x in idxs]]
             
-            inv = []
-            p = []
-            for i in range(n):
-                if inventory[idxs[i][0]] >= x_t[i]:
-                    inv.append(inventory[idxs[i][0]])
-                else:
-                    inv.append(x_t[i])
+            inv = [inventory[x[0]] for x in idxs]
+            p = [prices[x[1]] for x in idxs]
+            # inv = []
+            # p = []
+            # for i in range(n):
+            #     # if inventory[idxs[i][0]] >= x_t[i]:
+            #     #     inv.append(inventory[idxs[i][0]])
+            #     # else:
+            #     #     print("!!!")
+            #     #     inv.append(x_t[i])
                 
-                p.append(prices[idxs[i][1]])
+            #     p.append(prices[idxs[i][1]])
+            #     inv.append(inventory[idxs[i][0]])
 
             doli = spros.distribution(p)
 
             pi = []
             for i in range(n):
-                pi_i = p[i] * doli[i] - c_i * (inv[i] - x_t[i]) - h_plus * max(0, inv[i] - doli[i]) - v_minus * min(0, inv[i] - doli[i])
+                pi_i = p[i] * doli[i] - c_i * (inv[i] - x_t[i]) - h_plus * max(0, inv[i] - doli[i]) - v_minus * min(0, doli[i] - inv[i])
                 pi.append(pi_i)
 
             if len(learn) == MEMORY_VOLUME:
@@ -440,32 +443,37 @@ if VISUALIZE or SAVE:
         plt.show()
 
 
-Price_history = np.array(Price_history)
-Profit_history = np.array(Profit_history)
-# print(Price_history)
-# print(Profit_history)
+if SUMMARY:
+    Price_history = np.array(Price_history)
+    Profit_history = np.array(Profit_history)
+    # print(Price_history)
+    # print(Profit_history)
 
-print(f"Средняя цена по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Price_history[:, i]), 3)) for i in range(n)]))
-print(f"Средняя прибыль по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)]))
+    print(f"Средняя цена по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Price_history[:, i]), 3)) for i in range(n)]))
 
-if TN_DDQN == 1:
-    Stock_history = np.array(Stock_history)
-    # print(Stock_history)
-    print(f"Среднии запасы по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)]))
+    if TN_DDQN == 1:
+        Stock_history = np.array(Stock_history)
+        # print(Stock_history)
+        print(f"Среднии запасы по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)]))
 
-print("-"*20*n)
-print("Теоретические цены:", round(p_NE , 3), round(p_M , 3))
-print("Теоретические прибыли:", round(pi_NE , 3), round(pi_M , 3))
+    print(f"Средняя прибыль по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)]))
 
-if TN_DDQN == 1:
-    print("Теоретические инв. в запасы:", round(inv_NE , 3), round(inv_M , 3))
+    print("-"*20*n)
+    print("Теоретические цены:", round(p_NE , 3), round(p_M , 3))
 
-print("-"*20*n)
-print("Индекс сговора по цене:", str(round(100 * (np.mean(Price_history) - p_NE)/(p_M - p_NE), 2)) + "%")
-print("Индекс сговора по прибыли:", str(round(100 * (np.mean(Profit_history) - pi_NE)/(pi_M - pi_NE), 2)) + "%")
+    if TN_DDQN == 1:
+        print("Теоретические инв. в запасы:", round(inv_NE , 3), round(inv_M , 3))
 
-if TN_DDQN == 1:
-    print("Индекс сговора по запасам:", str(round(100 * (np.mean(Stock_history) - inv_NE)/(inv_M - inv_NE), 2)) + "%")
+    print("Теоретические прибыли:", round(pi_NE , 3), round(pi_M , 3))
+
+    print("-"*20*n)
+    print("Индекс сговора по цене:", str(round(100 * (np.mean(Price_history) - p_NE)/(p_M - p_NE), 2)) + "%")
+
+    if TN_DDQN == 1:
+        print("Индекс сговора по запасам:", str(round(100 * (np.mean(Stock_history) - inv_NE)/(inv_M - inv_NE), 2)) + "%")
+
+    print("Индекс сговора по прибыли:", str(round(100 * (np.mean(Profit_history) - pi_NE)/(pi_M - pi_NE), 2)) + "%")
+
 
 """
 Средняя цена по всем раундам: 1.6830796000000001 1.6826728
@@ -476,28 +484,16 @@ n = 2, ENV = 100, T = 100000, mode = "zhou", MEMORY_VOLUME = 1, own = False
 Средняя прибыль по всем раундам: 0.12345687961002637 0.12364908988203568 0.12292997137728587
 n = 3, eps = 0.9, ENV = 100, T = 100000, mode = "zhou", MEMORY_VOLUME = 1, own = False
 
-T = 10000, ENV = 40
-Средняя цена по всем раундам: 0.926 0.975
-Средняя прибыль по всем раундам: 0.173 0.134
-Среднии запасы по всем раундам: 0.476 0.466
+T = 10000, ENV = 30, h_plus = 1.17498, v_minus = 1.17498, n = 2, arms = 21 (оба), batch_size = 128
+Средняя цена по последним 500 раундов: 0.858 0.837
+Средняя прибыль по последним 500 раундов: 0.24 0.265
+Среднии запасы по последним 500 раундов: 0.467 0.402
 ----------------------------------------
 Теоретические цены: 0.723 1.175
 Теоретические прибыли: 0.223 0.337
 Теоретические инв. в запасы: 0.471 0.365
 ----------------------------------------
-Индекс сговора по цене: 50.37%
-Индекс сговора по прибыли: -60.34%
-Индекс сговора по запасам: 0.35%
-
-Средняя цена по последним 5000 раундов: 0.954 0.933
-Средняя прибыль по последним 5000 раундов: 0.291 0.304
-Среднии запасы по последним 5000 раундов: 0.244 0.274
-----------------------------------------
-Теоретические цены: 0.723 1.175
-Теоретические прибыли: 0.223 0.337
-Теоретические инв. в запасы: 0.471 0.365
-----------------------------------------
-Индекс сговора по цене: 48.7%
-Индекс сговора по прибыли: 64.98%
-Индекс сговора по запасам: 199.09%
+Индекс сговора по цене: 27.59%
+Индекс сговора по прибыли: 25.81%
+Индекс сговора по запасам: 34.82%
 """

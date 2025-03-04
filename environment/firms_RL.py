@@ -253,10 +253,10 @@ class TN_DDQN:
             state_dim: int,
             inventory_actions: list,
             price_actions: list,
-            batch_size:int,  # =32,
+            batch_size:int,
             MEMORY_VOLUME: int,
-            gamma: float, # =0.95,
-            lr: float, # =0.001,
+            gamma: float,
+            lr: float,
             eps: float,
             mode: str,
             target_update_freq: int,
@@ -273,11 +273,11 @@ class TN_DDQN:
 
         # Q-network
         self.online = DQNet(state_dim, inventory_actions, price_actions)
-        self.target_net = deepcopy(self.online)
+        self.target = deepcopy(self.online)
 
         if cuda_usage:
             self.online = DQNet(state_dim, inventory_actions, price_actions).to(self.device)
-            self.target_net = deepcopy(self.online).to(self.device)
+            self.target = deepcopy(self.online).to(self.device)
         
         # Hyperparameters
         self.batch_size = batch_size
@@ -291,15 +291,17 @@ class TN_DDQN:
         elif mode == "zhou":
             self.eps_min = 0.01
             self.eps_max = 1
-            self.beta = 0.005 # 1.5/(10**4)
+            self.beta = 1.5/(10**4) # 0.005, 1.5/(10**3), 1.5/(10**4)
         
         self.target_update_freq = target_update_freq
         self.memory = deque(maxlen=memory_size)
         
         self.optimizer = torch.optim.Adam(self.online.parameters(), lr=lr)
 
+
     def __repr__(self):
         return "TN_DDQN"    
+
 
     def _get_state_vector(self, firm_state):
         """Преобразует состояние фирмы в тензор"""
@@ -314,7 +316,7 @@ class TN_DDQN:
     def suggest_actions(self, firm_state):
         """Возвращает действия (инвентарь, цену)"""
         if self.t < 0:
-            inv_idx = random.randint(0, len(self.inventory_actions)-1)
+            inv_idx = random.randint(np.sum(self.inventory_actions < firm_state["current_inventory"]), len(self.inventory_actions)-1)
             price_idx = random.randint(0, len(self.price_actions)-1)
             self.t += 1
             return (inv_idx, price_idx)
@@ -322,11 +324,20 @@ class TN_DDQN:
         state = self._get_state_vector(firm_state)
         
         if random.random() < self.eps:
-            inv_idx = random.randint(0, len(self.inventory_actions)-1)
+            inv_idx = random.randint(np.sum(self.inventory_actions < firm_state["current_inventory"]), len(self.inventory_actions)-1)
             price_idx = random.randint(0, len(self.price_actions)-1)
         else:
             with torch.no_grad():
                 inv_q, price_q = self.online(state.unsqueeze(0), 'online')
+
+                if not self.cuda_usage:
+                    inventory_actions_tensor = torch.tensor(self.inventory_actions)
+                else:
+                    inventory_actions_tensor = torch.tensor(self.inventory_actions).to(self.device)
+                
+                mask = inventory_actions_tensor.unsqueeze(0) < state[0]
+                inv_q[mask] = -float('inf')
+
                 inv_idx = torch.argmax(inv_q).item()
                 price_idx = torch.argmax(price_q).item()
         
@@ -390,19 +401,25 @@ class TN_DDQN:
         
         mask = inventory_actions_tensor.unsqueeze(0) < states[:, 0].unsqueeze(1)
         inv_q_online[mask] = -float('inf')
-        
+
         inv_selected = inv_q_online.gather(1, actions[:, 0].unsqueeze(1))
         price_selected = price_q_online.gather(1, actions[:, 1].unsqueeze(1))
 
         # Target Q values (target network)
         with torch.no_grad():
-            inv_q_target, price_q_target = self.target_net(next_states, 'target')
+            inv_q_target, price_q_target = self.target(next_states, 'target')
+            inv_to_max_online, price_to_max_online = self.online(next_states, 'online')
             
             mask_target = inventory_actions_tensor.unsqueeze(0) < next_states[:, 0].unsqueeze(1)
             inv_q_target[mask_target] = -float('inf')
+            inv_to_max_online[mask_target] = -float('inf')
+            
+            inv_argmax = torch.argmax(inv_to_max_online, dim = 1)
+            price_argmax = torch.argmax(price_to_max_online, dim = 1)
+            
+            inv_max = torch.gather(inv_q_target, 1, inv_argmax.unsqueeze(1)).squeeze()
+            price_max = torch.gather(price_q_target, 1, price_argmax.unsqueeze(1)).squeeze()
 
-            inv_max = inv_q_target.max(1)[0]
-            price_max = price_q_target.max(1)[0]
             targets = rewards + self.gamma * (inv_max + price_max)
 
         # Loss calculation
@@ -416,7 +433,7 @@ class TN_DDQN:
         self.optimizer.step()
 
         if self.t >= 0 and self.t % self.target_update_freq == 0:
-            self.target_net.load_state_dict(self.online.state_dict())
+            self.target.load_state_dict(self.online.state_dict())
 
         return total_loss.item()
 
@@ -440,28 +457,7 @@ class TN_DDQN:
         """Загрузка модели"""
         checkpoint = torch.load(path)
         self.online.load_state_dict(checkpoint['model'])
-        self.target_net.load_state_dict(checkpoint['model'])
+        self.target.load_state_dict(checkpoint['model'])
         self.eps = checkpoint.get('exploration', 1.0)
         self.memory = checkpoint.get('memory', deque(maxlen=self.memory_size))
 
-#### ЭТО НУЖНО СДЕЛАТЬ!
-# class TN_DDQN:
-     
-#     def __init__(
-#             self,
-            
-# 			):
-
-#         pass
-
-#     def __repr__(self):
-#         return "TN_DDQN"
-
-#     def adjust_memory(self, ):
-#         pass
-
-#     def suggest(self):
-#         pass
-
-#     def update(self, ):
-#         pass
