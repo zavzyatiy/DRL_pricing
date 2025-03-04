@@ -73,14 +73,14 @@ class demand_function:
 
 e1 = {
     "T": 10000,
-    "ENV": 10,
+    "ENV": 30,
     "n": 2,
     "m": 5,
     "delta": 0.95,
     "gamma": 0.5,
     "c_i": 0.25, # 1
-    "h_plus": 1.17498/2, # 1.17498/2, # Из Zhou: примерно половина монопольной цены
-    "v_minus": 1.17498/4, # 1.17498/4, # Из Zhou: примерно четверть монопольной цены
+    "h_plus": 1.17498, # 1.17498/2, # Из Zhou: примерно половина монопольной цены
+    "v_minus": 1.17498, # 1.17498/4, # Из Zhou: примерно четверть монопольной цены
     "eta": 0.05,
     "color": ["#FF7F00", "#1874CD", "#548B54", "#CD2626", "#CDCD00"],
     "profit_dynamic": "compare", # "MA", "real", "compare"
@@ -88,13 +88,14 @@ e1 = {
     "VISUALIZE_THEORY": True,
     "VISUALIZE": True,
     "SAVE": False,
+    "SUMMARY": True,
 }
 
 e2 = {
     "p_inf": e1["c_i"],
     "p_sup": 2, # 3*e1["c_i"] + e1["h_plus"] + e1["v_minus"], 2.5
-    "arms_amo_price": 31,
-    "arms_amo_inv": 31,
+    "arms_amo_price": 21,
+    "arms_amo_inv": 21,
 }
 
 mode = "D"
@@ -152,13 +153,13 @@ e4 = {
         "inventory_actions": inventory,
         "price_actions": prices,
         "MEMORY_VOLUME": MEMORY_VOLUME,
-        "batch_size": 32, # 32
+        "batch_size": 128, # 32
         "gamma": e1["delta"],
         "lr": 0.0001,
         "eps": 0.4,
         "mode": "zhou", # None, "sanchez_cartas", "zhou"
-        "target_update_freq": e1["T"]//100, # 100
-        "memory_size": 10000, # 10000
+        "target_update_freq": e1["T"]//100, # e1["T"]//100, 100
+        "memory_size": 1000, # 10000
     },
     "own": own,
 }
