@@ -288,11 +288,11 @@ class TN_DDQN:
         self.mode = mode
 
         if mode == "sanchez_cartas":
-            self.beta = 1.5/(10**4)
+            self.beta = 1.5/(10**4) # 0.005, 1.5/(10**3), 1.5/(10**4)
         elif mode == "zhou":
             self.eps_min = 0.01
             self.eps_max = 1
-            self.beta = 1.5/(10**4) # 0.005, 1.5/(10**3), 1.5/(10**4)
+            self.beta = 1.5/(10**3) # 0.005, 1.5/(10**3), 1.5/(10**4)
         
         self.target_update_freq = target_update_freq
         self.memory_size = memory_size

@@ -79,13 +79,13 @@ class demand_function:
 
 e1 = {
     "T": 10000,
-    "ENV": 1,
+    "ENV": 100,
     "n": 2,
     "m": 5,
     "delta": 0.95,
     "gamma": 0.5,
     "c_i": 0.25, # 0.25, 1
-    "h_plus": 1.17498/2, # 1.17498/2, # Из Zhou: примерно половина монопольной цены
+    "h_plus": 1.17498/4, # 1.17498/2, # Из Zhou: примерно половина монопольной цены
     "v_minus": 1.17498/4, # 1.17498/4, # Из Zhou: примерно четверть монопольной цены
     "eta": 0.05,
     "color": ["#FF7F00", "#1874CD", "#548B54", "#CD2626", "#CDCD00"],
@@ -100,8 +100,8 @@ e1 = {
 e2 = {
     "p_inf": e1["c_i"],
     "p_sup": 2, # 3*e1["c_i"] + e1["h_plus"] + e1["v_minus"], 2.5
-    "arms_amo_price": 21,
-    "arms_amo_inv": 21,
+    "arms_amo_price": 51,
+    "arms_amo_inv": 51,
 }
 
 mode = "D"
@@ -159,7 +159,7 @@ e4 = {
         "inventory_actions": inventory,
         "price_actions": prices,
         "MEMORY_VOLUME": MEMORY_VOLUME,
-        "batch_size": 32, # 32
+        "batch_size": 128, # 32
         "gamma": e1["delta"],
         "lr": 0.0001,
         "eps": 0.4,
