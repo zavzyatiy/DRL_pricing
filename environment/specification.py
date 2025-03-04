@@ -100,8 +100,8 @@ e1 = {
 e2 = {
     "p_inf": e1["c_i"],
     "p_sup": 2, # 3*e1["c_i"] + e1["h_plus"] + e1["v_minus"], 2.5
-    "arms_amo_price": 51,
-    "arms_amo_inv": 51,
+    "arms_amo_price": 41,
+    "arms_amo_inv": 41,
 }
 
 mode = "D"
