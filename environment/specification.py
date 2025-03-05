@@ -67,8 +67,8 @@ class demand_function:
                 c = point_M
                 point_M = -self.mu * np.log(point_M - c_i - self.mu) + self.mu * np.log(self.mu * self.n) + self.a
             
-            pi_NE = self.C * (point_NE - c_i)*self.distribution([point_NE]*self.n)[0]
-            pi_M = self.C * (point_M - c_i)*self.distribution([point_M]*self.n)[0]
+            pi_NE = (point_NE - c_i)*self.distribution([point_NE]*self.n)[0]
+            pi_M = (point_M - c_i)*self.distribution([point_M]*self.n)[0]
 
             return point_NE, point_M, pi_NE, pi_M
 
@@ -78,13 +78,13 @@ class demand_function:
 
 e1 = {
     "T": 10000,
-    "ENV": 1,
+    "ENV": 100,
     "n": 2,
     "m": 5,
     "delta": 0.95,
     "gamma": 0.5,
     "c_i": 1, # 0.25, 1
-    "h_plus": 6, # 1.17498/2, # Из Zhou: примерно половина монопольной цены
+    "h_plus": 3, # 1.17498/2, # Из Zhou: примерно половина монопольной цены
     "v_minus": 3, # 1.17498/4, # Из Zhou: примерно четверть монопольной цены
     "eta": 0.05,
     "color": ["#FF7F00", "#1874CD", "#548B54", "#CD2626", "#CDCD00"],
@@ -98,9 +98,9 @@ e1 = {
 
 e2 = {
     "p_inf": e1["c_i"],
-    "p_sup": 2, # 3*e1["c_i"] + e1["h_plus"] + e1["v_minus"], 2.5
-    "arms_amo_price": 51,
-    "arms_amo_inv": 51,
+    "p_sup": 2.5, # 2, 2.5
+    "arms_amo_price": 101,
+    "arms_amo_inv": 101,
 }
 
 e3 = {
@@ -158,7 +158,7 @@ e4 = {
         "inventory_actions": inventory,
         "price_actions": prices,
         "MEMORY_VOLUME": MEMORY_VOLUME,
-        "batch_size": 128, # 32
+        "batch_size": 32, # 32
         "gamma": e1["delta"],
         "lr": 0.0001,
         "eps": 0.4,
@@ -197,3 +197,8 @@ Environment = e1 | e2 | e3 | e4 | e5
 
 # bbb = np.array([[1, 2, 3], [4, 5, 6]])
 # print(np.maximum(0, bbb - 3 * np.ones((2, 3))))
+
+# demand_params = Environment["demand_params"]
+# spros = demand_function(**demand_params)
+# print(np.array([1.623, 1.627]) * spros.distribution([1.623, 1.627]) - (2*np.array([12.402, 12.399]) - spros.distribution([1.623, 1.627])) - 3 * ( spros.distribution([1.623, 1.627]) - np.array([12.402, 12.399])))
+print(Environment)
