@@ -18,7 +18,8 @@ class demand_function:
             n: int,
             mode: str,
             a: None,
-            mu: None,          
+            mu: None,
+            C: None,       
 			):
 
         mode_list = ["logit"]
@@ -26,12 +27,10 @@ class demand_function:
         assert mode in mode_list, f"Demand function must be in [{' '.join(mode_list)}]"
         self.n = n
         self.mode = mode
-        if a and mu:
+        if a and mu and C:
             self.a = a
             self.mu = mu
-        else:
-            self.a = None
-            self.mu = None
+            self.C = C
     
     def distribution(self, prices):
         assert len(prices) == self.n, f"Demand is built for n = {self.n}, not for {len(prices)}"
@@ -50,7 +49,7 @@ class demand_function:
             sum_exp = np.sum(exp_s)
             # return [x/sum_exp for x in exp_s[1:]]
             res = exp_s/sum_exp
-            return res[1:]
+            return self.C * res[1:]
     
     def get_theory(self, c_i):
         precision = 0.0001
@@ -68,8 +67,8 @@ class demand_function:
                 c = point_M
                 point_M = -self.mu * np.log(point_M - c_i - self.mu) + self.mu * np.log(self.mu * self.n) + self.a
             
-            pi_NE = (point_NE - c_i)*self.distribution([point_NE]*self.n)[0]
-            pi_M = (point_M - c_i)*self.distribution([point_M]*self.n)[0]
+            pi_NE = self.C * (point_NE - c_i)*self.distribution([point_NE]*self.n)[0]
+            pi_M = self.C * (point_M - c_i)*self.distribution([point_M]*self.n)[0]
 
             return point_NE, point_M, pi_NE, pi_M
 
@@ -79,14 +78,14 @@ class demand_function:
 
 e1 = {
     "T": 10000,
-    "ENV": 100,
+    "ENV": 1,
     "n": 2,
     "m": 5,
     "delta": 0.95,
     "gamma": 0.5,
-    "c_i": 0.25, # 0.25, 1
-    "h_plus": 1.17498/4, # 1.17498/2, # Из Zhou: примерно половина монопольной цены
-    "v_minus": 1.17498/4, # 1.17498/4, # Из Zhou: примерно четверть монопольной цены
+    "c_i": 1, # 0.25, 1
+    "h_plus": 6, # 1.17498/2, # Из Zhou: примерно половина монопольной цены
+    "v_minus": 3, # 1.17498/4, # Из Zhou: примерно четверть монопольной цены
     "eta": 0.05,
     "color": ["#FF7F00", "#1874CD", "#548B54", "#CD2626", "#CDCD00"],
     "profit_dynamic": "compare", # "MA", "real", "compare"
@@ -100,19 +99,9 @@ e1 = {
 e2 = {
     "p_inf": e1["c_i"],
     "p_sup": 2, # 3*e1["c_i"] + e1["h_plus"] + e1["v_minus"], 2.5
-    "arms_amo_price": 41,
-    "arms_amo_inv": 41,
+    "arms_amo_price": 51,
+    "arms_amo_inv": 51,
 }
-
-mode = "D"
-
-if mode == "D":
-    prices = np.linspace(e2["p_inf"], e2["p_sup"], e2["arms_amo_price"])
-    inventory = np.linspace(0, 1, e2["arms_amo_inv"])
-else:
-    prices = (e2["p_inf"], e2["p_sup"])
-    inventory = (0, 1)
-
 
 e3 = {
     "demand_params":{
@@ -120,8 +109,18 @@ e3 = {
         "mode": "logit",
         "a": e1["c_i"] + 1,
         "mu": 0.25,
+        "C": 30,
     },
 }
+
+mode = "D"
+
+if mode == "D":
+    prices = np.linspace(e2["p_inf"], e2["p_sup"], e2["arms_amo_price"])
+    inventory = np.linspace(0, e3["demand_params"]["C"], e2["arms_amo_inv"])
+else:
+    prices = (e2["p_inf"], e2["p_sup"])
+    inventory = (0, e3["demand_params"]["C"])
 
 MEMORY_VOLUME = 1
 own = False
