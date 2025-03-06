@@ -77,7 +77,7 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 10000,
+    "T": 100000,
     "ENV": 100,
     "n": 2,
     "m": 5,
@@ -195,10 +195,4 @@ Environment = e1 | e2 | e3 | e4 | e5
 #     mode = mode,
 #     )
 
-# bbb = np.array([[1, 2, 3], [4, 5, 6]])
-# print(np.maximum(0, bbb - 3 * np.ones((2, 3))))
-
-# demand_params = Environment["demand_params"]
-# spros = demand_function(**demand_params)
-# print(np.array([1.623, 1.627]) * spros.distribution([1.623, 1.627]) - (2*np.array([12.402, 12.399]) - spros.distribution([1.623, 1.627])) - 3 * ( spros.distribution([1.623, 1.627]) - np.array([12.402, 12.399])))
 print(Environment)
