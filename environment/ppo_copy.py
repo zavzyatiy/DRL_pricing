@@ -211,6 +211,7 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 class Agent(nn.Module):
     def __init__(self, frames=4):
         super(Agent, self).__init__()
+
         self.network = nn.Sequential(
             layer_init(nn.Conv2d(27, 16, kernel_size=3, stride=2)),
             nn.ReLU(),
@@ -219,6 +220,7 @@ class Agent(nn.Module):
             nn.Flatten(),
             layer_init(nn.Linear(32*3*3, 128)),
             nn.ReLU(),)
+
         self.actor = layer_init(nn.Linear(128, envs.action_space.nvec.sum()), std=0.01)
         self.critic = layer_init(nn.Linear(128, 1), std=1)
 
@@ -265,6 +267,7 @@ global_step = 0
 next_obs = envs.reset()
 next_done = torch.zeros(args.num_envs).to(device)
 num_updates = args.total_timesteps // args.batch_size
+
 for update in range(1, num_updates+1):
     # Annealing the rate if instructed to do so.
     if args.anneal_lr:

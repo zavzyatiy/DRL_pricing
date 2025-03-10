@@ -6,6 +6,7 @@
 import random
 import numpy as np
 import torch.nn as nn
+import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from copy import deepcopy
@@ -14,9 +15,9 @@ from copy import deepcopy
 from specification import Environment, demand_function
 
 ### иницализация randomseed
-# random.seed(42)
-# np.random.seed(42)
-# torch.manual_seed(42)
+random.seed(42)
+np.random.seed(42)
+torch.manual_seed(42)
 
 M = Environment["firm_model"]
 firm_params = Environment["firm_params"]

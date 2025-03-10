@@ -15,9 +15,9 @@ import torch.optim as optim
 from copy import deepcopy
 from collections import deque
 
-# random.seed(42)
-# np.random.seed(42)
-# torch.manual_seed(42)
+random.seed(42)
+np.random.seed(42)
+torch.manual_seed(42)
 
 """
 ##################################################
