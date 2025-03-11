@@ -266,7 +266,11 @@ class TN_DDQN:
             mode: str,
             target_update_freq: int,
             memory_size: int,
-            cuda_usage = False,
+            cuda_usage: bool,
+            eps_min: float,
+            eps_max: float,
+            beta: float,
+            dtype = torch.float32,
             ):
         
         self.state_dim = state_dim
@@ -276,14 +280,14 @@ class TN_DDQN:
 
         if cuda_usage:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = torch.device("cpu")
+
+        self.dtype = dtype
 
         # Q-network
-        self.online = DQNet(state_dim, inventory_actions, price_actions)
-        self.target = deepcopy(self.online)
-
-        if cuda_usage:
-            self.online = DQNet(state_dim, inventory_actions, price_actions).to(self.device)
-            self.target = deepcopy(self.online).to(self.device)
+        self.online = DQNet(state_dim, inventory_actions, price_actions).to(self.device)
+        self.target = deepcopy(self.online).to(self.device)
         
         # Hyperparameters
         self.batch_size = batch_size
@@ -292,12 +296,9 @@ class TN_DDQN:
         self.t = - batch_size - MEMORY_VOLUME
         self.mode = mode
 
-        if mode == "sanchez_cartas":
-            self.beta = 1.5/(10**4) # 0.005, 1.5/(10**3), 1.5/(10**4)
-        elif mode == "zhou":
-            self.eps_min = 0.01
-            self.eps_max = 1
-            self.beta = 1.5/(10**4) # 0.005, 1.5/(10**3)/2, 1.5/(10**3), 1.5/(10**4)
+        self.eps_min = eps_min # 0.01
+        self.eps_max = eps_max # 1
+        self.beta = beta # 0.005, 1.5/(10**3)/2, 1.5/(10**3), 1.5/(10**4)
         
         self.target_update_freq = target_update_freq
         self.memory_size = memory_size
@@ -314,10 +315,7 @@ class TN_DDQN:
         """Преобразует состояние фирмы в тензор"""
         inventory = firm_state['current_inventory']
         comp_prices = np.array(firm_state['competitors_prices']).flatten()
-        if not self.cuda_usage:
-            return torch.FloatTensor([inventory] + comp_prices.tolist())
-        else:
-            return torch.FloatTensor([inventory] + comp_prices.tolist()).to(self.device)
+        return torch.tensor([inventory] + comp_prices.tolist(), dtype=self.dtype, device=self.device)
 
 
     def suggest_actions(self, firm_state):
@@ -336,11 +334,7 @@ class TN_DDQN:
         else:
             with torch.no_grad():
                 inv_q, price_q = self.online(state.unsqueeze(0), 'online')
-
-                if not self.cuda_usage:
-                    inventory_actions_tensor = torch.tensor(self.inventory_actions) # , dtype = torch.float16
-                else:
-                    inventory_actions_tensor = torch.tensor(self.inventory_actions).to(self.device)
+                inventory_actions_tensor = torch.tensor(self.inventory_actions, dtype = self.dtype).to(self.device)
                 
                 mask = inventory_actions_tensor.unsqueeze(0) < state[0]
                 inv_q[mask] = -float('inf')
@@ -373,15 +367,13 @@ class TN_DDQN:
                     state_vec,
                     actions,
                     reward,
-                    # torch.LongTensor(rewards),
                     next_vec,
                 ))
             else:
                 self.memory.append((
                     state_vec.cpu(),  # Храним в CPU памяти
                     actions,
-                    torch.FloatTensor(reward).to(self.device),
-                    # torch.LongTensor(rewards).to(self.device),
+                    torch.tensor([reward], dtype = self.dtype).to(self.device),
                     next_vec.cpu()
                 ))
 
@@ -394,23 +386,19 @@ class TN_DDQN:
             batch = random.sample(self.memory, self.batch_size)
             states = torch.stack([x[0] for x in batch])
             actions = torch.LongTensor([x[1] for x in batch])
-            rewards = torch.FloatTensor([x[2] for x in batch])
-            # rewards = torch.stack([x[2] for x in batch])
+            rewards = torch.tensor([x[2] for x in batch], dtype = self.dtype)
             next_states = torch.stack([x[3] for x in batch])
         else:
             batch = random.sample(self.memory, self.batch_size)
             states = torch.stack([x[0] for x in batch]).to(self.device)
             actions = torch.LongTensor([x[1] for x in batch]).to(self.device)
-            rewards = torch.stack([x[2] for x in batch]).to(self.device)
+            rewards = torch.stack([x[2] for x in batch], dim = 1)[0].to(self.device)
             next_states = torch.stack([x[3] for x in batch]).to(self.device)
 
         # Current Q values (online network)
         inv_q_online, price_q_online = self.online(states, 'online')
 
-        if not self.cuda_usage:
-            inventory_actions_tensor = torch.tensor(self.inventory_actions)
-        else:
-            inventory_actions_tensor = torch.tensor(self.inventory_actions).to(self.device)
+        inventory_actions_tensor = torch.tensor(self.inventory_actions, dtype = self.dtype).to(self.device)
         
         mask = inventory_actions_tensor.unsqueeze(0) < states[:, 0].unsqueeze(1)
         inv_q_online[mask] = -float('inf')
@@ -429,21 +417,13 @@ class TN_DDQN:
             
             inv_argmax = torch.argmax(inv_to_max_online, dim = 1)
             price_argmax = torch.argmax(price_to_max_online, dim = 1)
-            
+
             inv_max = torch.gather(inv_q_target, 1, inv_argmax.unsqueeze(1)).squeeze()
             price_max = torch.gather(price_q_target, 1, price_argmax.unsqueeze(1)).squeeze()
 
             targets = rewards + self.gamma * (inv_max + price_max)
-            # targets_inv = rewards[:, 0] + self.gamma * (inv_max)
-            # targets_price = rewards[:, 1] + self.gamma * (price_max)
 
         # Loss calculation
-        # loss_inv = F.mse_loss(inv_selected.squeeze(), targets)
-        # loss_price = F.mse_loss(price_selected.squeeze(), targets)
-        ## loss_inv = F.mse_loss(inv_selected.squeeze(), targets_inv)
-        ## loss_price = F.mse_loss(price_selected.squeeze(), targets_price)
-        # total_loss = loss_inv + loss_price
-        
         total_loss = F.mse_loss(inv_selected.squeeze() + price_selected.squeeze(), targets)
 
         # Optimize

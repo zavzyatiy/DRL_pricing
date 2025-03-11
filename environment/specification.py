@@ -166,6 +166,10 @@ e4 = {
         "mode": "zhou", # None, "sanchez_cartas", "zhou"
         "target_update_freq": 100, # e1["T"]//100, 100
         "memory_size": 1000, # 10000
+        "cuda_usage": True,
+        "eps_min": 0.01,
+        "eps_max": 1,
+        "beta": 1.5/(10**4),
     },
     "own": own,
 }
