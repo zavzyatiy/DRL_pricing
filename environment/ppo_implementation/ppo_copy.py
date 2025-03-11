@@ -18,6 +18,13 @@ import random
 import os
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecEnvWrapper
 
+"""
+##################################################
+COPYPASTED FOR FUTURE IMPLAMINTATION!
+Orginal: https://github.com/vwxyzjn/invalid-action-masking
+##################################################
+"""
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PPO agent')
     # Common arguments

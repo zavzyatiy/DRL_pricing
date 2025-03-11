@@ -19,12 +19,16 @@ random.seed(42)
 np.random.seed(42)
 torch.manual_seed(42)
 
+
 """
 ##################################################
-COPYPASTED FOR FUTURE IMPLAMINTATION!
-Orginal: https://github.com/00ber/Deep-Q-Networks/blob/main/src/airstriker-genesis/agent.py
+Projects for ideas and code:
+TN-DDQN: https://github.com/00ber/Deep-Q-Networks/blob/main/src/airstriker-genesis/agent.py , DeepSeek R1
+PPO: https://github.com/vwxyzjn/invalid-action-masking , DeepSeek R1
+SAC: https://github.com/denisyarats/pytorch_sac , DeepSeek R1
 ##################################################
 """
+
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
