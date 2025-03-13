@@ -42,10 +42,11 @@ def train_on_policy_agent(agent,num_episodes,xi,c):
                 episode_return = 0
                 transition_dict = {'states': [], 'actions': [], 'next_states': [], 'rewards': [], 'counts': []}
                 random.seed(1)
-#                 state = [random.uniform(5,10),random.randint(400,500)]
+                # state = [random.uniform(5,10),random.randint(400,500)]
                 state = [35,500]
                 next_state =[0,0]
                 count = 0
+                ### Обкат имеющейся политики + сбор данных для её обновления
                 while count < 100:
                     action = agent.take_action(state)
                     next_state[0]= state[0] + action[0]
@@ -61,6 +62,7 @@ def train_on_policy_agent(agent,num_episodes,xi,c):
                     next_state =[0,0]
                     episode_return += reward
                 return_list.append(episode_return)
+                ### Обновление политики
                 agent.update(transition_dict)
                 if (i_episode+1) % 10 == 0:
                     pbar.set_postfix({'episode': '%d' % (num_episodes/10 * i + i_episode+1), 'return': '%.3f' % np.mean(return_list[-10:])})
