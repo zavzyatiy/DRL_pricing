@@ -24,8 +24,8 @@ torch.manual_seed(42)
 ##################################################
 Projects for ideas and code:
 TN-DDQN: https://github.com/00ber/Deep-Q-Networks/blob/main/src/airstriker-genesis/agent.py , DeepSeek R1
-PPO: https://github.com/vwxyzjn/invalid-action-masking , DeepSeek R1
-SAC: https://github.com/denisyarats/pytorch_sac , DeepSeek R1
+PPO: https://github.com/vwxyzjn/invalid-action-masking , https://github.com/Larry-Liu02/Dynamic-Pricing-Algorithm/ , DeepSeek R1
+SAC: https://github.com/denisyarats/pytorch_sac , https://github.com/Larry-Liu02/Dynamic-Pricing-Algorithm/ , DeepSeek R1
 ##################################################
 """
 
