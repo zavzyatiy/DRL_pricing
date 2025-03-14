@@ -9,7 +9,7 @@ import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from firms_RL import epsilon_greedy, TQL, TN_DDQN
+from firms_RL import epsilon_greedy, TQL, TN_DDQN, PPO_D, PPO_C, PPO_D_CriticNet
 
 ### Всевозможные модели спросов
 class demand_function:
@@ -78,8 +78,8 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 100000,
-    "ENV": 100,
+    "T": 10000,
+    "ENV": 1,
     "n": 2,
     "m": 5,
     "delta": 0.95,
@@ -99,9 +99,9 @@ e1 = {
 
 e2 = {
     "p_inf": e1["c_i"],
-    "p_sup": 2.5, # 2, 2.5
-    "arms_amo_price": 101,
-    "arms_amo_inv": 101,
+    "p_sup": 2.5,           # 2, 2.5
+    "arms_amo_price": 101,   # 101
+    "arms_amo_inv": 101,     # 101
 }
 
 e3 = {
@@ -150,32 +150,6 @@ ONLY_OWN = False
 ##########################
 ### TN_DDQN
 ##########################
-e4 = {
-    "prices": prices,
-    "inventory": inventory,
-    "firm_model": TN_DDQN,
-    "firm_params": {
-        "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
-        "inventory_actions": inventory,
-        "price_actions": prices,
-        "MEMORY_VOLUME": MEMORY_VOLUME,
-        "batch_size": 32, # 32
-        "gamma": e1["delta"],
-        "lr": 0.0001,
-        "eps": 0.4,
-        "mode": "zhou", # None, "sanchez_cartas", "zhou"
-        "target_update_freq": 100, # e1["T"]//100, 100
-        "memory_size": 1000, # 10000
-        "cuda_usage": True,
-        "eps_min": 0.01,
-        "eps_max": 1,
-        "beta": 1.5/(10**4),
-    },
-    "own": own,
-}
-##########################
-### PPO-D
-##########################
 # e4 = {
 #     "prices": prices,
 #     "inventory": inventory,
@@ -199,6 +173,30 @@ e4 = {
 #     },
 #     "own": own,
 # }
+##########################
+### PPO-D
+##########################
+e4 = {
+    "prices": prices,
+    "inventory": inventory,
+    "firm_model": PPO_D,
+    "N_epochs": max(100, len(prices) + len(inventory)), # e1["T"]//100
+    "firm_params": {
+        "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+        "inventory_actions": inventory,
+        "price_actions": prices,
+        "batch_size": 32, # 32
+        "epochs": max(100, len(prices) + len(inventory)), # max(100, len(prices) + len(inventory))
+        "gamma": e1["delta"],
+        "actor_lr": 0.0001,
+        "critic_lr": 0.0001,
+        "clip_eps": 0.2,
+        "lmbda": 0.9,
+        "cuda_usage": True,
+    },
+    "MEMORY_VOLUME": MEMORY_VOLUME,
+    "own": own,
+}
 ##########################
 ### PPO-C
 ##########################

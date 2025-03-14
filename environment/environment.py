@@ -21,7 +21,7 @@ torch.manual_seed(42)
 
 M = Environment["firm_model"]
 firm_params = Environment["firm_params"]
-HAS_INV = int(int(str(M(**firm_params)) in ["TN_DDQN", "PPO_D", "PPO_C", "SAC"]))
+HAS_INV = int(str(M(**firm_params)) in ["TN_DDQN", "PPO_D", "PPO_C", "SAC"])
 
 ### количество итераций внутри среды
 T = Environment["T"]
@@ -83,11 +83,17 @@ if str(M(**firm_params)) == "TQL":
     MEMORY_VOLUME = Environment["firm_params"]["MEMORY_VOLUME"]
     own = Environment["firm_params"]["own"]
     ONLY_OWN = Environment["firm_params"]["ONLY_OWN"]
-
-elif HAS_INV == 1:
+elif str(M(**firm_params)) == "TN_DDQN":
     MEMORY_VOLUME = Environment["firm_params"]["MEMORY_VOLUME"]
     batch_size = Environment["firm_params"]["batch_size"]
     own = Environment["own"]
+elif str(M(**firm_params)) == "PPO_D":
+    MEMORY_VOLUME = Environment["MEMORY_VOLUME"]
+    own = Environment["own"]
+    batch_size = Environment["firm_params"]["batch_size"]
+    N_epochs = Environment["N_epochs"]
+    epochs = Environment["firm_params"]["epochs"]
+    assert (N_epochs >= batch_size) # and (N_epochs >= epochs)
 
 Price_history = []
 Profit_history = []
@@ -308,8 +314,104 @@ for env in range(ENV):
             raw_stock_history.append(inv)
 
     elif str(firms[0]) == "PPO_D":
+        total_t = -MEMORY_VOLUME
+        with tqdm(total = T + MEMORY_VOLUME, desc=f'Раунд {env + 1}') as pbar:
+            while total_t < T:
+                # for t in tqdm(range(- MEMORY_VOLUME - batch_size, T), f"Раунд {env + 1}"):
+                if total_t < 0:
+                    min_t = total_t
+                    max_t = 0
+                else:
+                    min_t = total_t
+                    max_t = min(total_t + N_epochs, T)
+                
+                for t in range(min_t, max_t):
 
-        continue
+                    # print("!!!", t)
+
+                    idxs = []
+                    # print("ЗАПАСЫ", x_t)
+                    for i in range(n):
+                        # print("Фирма:", i)
+                        state_i = mem.copy()
+
+                        if len(state_i) == MEMORY_VOLUME and not(own):
+                            for j in range(MEMORY_VOLUME):
+                                state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
+                        
+                        firm_state = {
+                            'current_inventory': x_t[i],
+                            'competitors_prices': state_i,
+                        }
+
+                        if t >= 0:
+                            idxs_i = firms[i].suggest_actions(firm_state)
+                        else:
+                            idxs_i = (torch.LongTensor(random.sample([i for i in range(len(inventory))], 1)),
+                                      torch.LongTensor(random.sample([i for i in range(len(prices))], 1)))
+                        # print("Действия", idxs_i)
+                        idxs.append(idxs_i)
+
+                    learn = mem.copy()
+
+                    if len(learn) < MEMORY_VOLUME:
+                        learn.append([x[1] for x in idxs])
+                    else:
+                        learn = learn[1:] + [[x[1] for x in idxs]]
+                    
+                    inv = np.array([inventory[x[0]] for x in idxs])
+                    p = np.array([prices[x[1]] for x in idxs])
+
+                    doli = spros.distribution(p)
+
+                    pi = p * doli - c_i * (inv - np.array(x_t)) - h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
+
+                    if len(learn) == MEMORY_VOLUME:
+                        for i in range(n):
+                            state_i = mem.copy()
+                            if len(state_i) == MEMORY_VOLUME and not(own):
+                                for j in range(MEMORY_VOLUME):
+                                    state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
+                            
+                            new = learn.copy()
+                            if len(new) == MEMORY_VOLUME and not(own):
+                                for j in range(MEMORY_VOLUME):
+                                    new[j] = new[j][: i] + new[j][i + 1 :]
+                            
+                            prev_state = {
+                                'current_inventory': x_t[i],
+                                'competitors_prices': state_i,
+                            }
+
+                            new_state = {
+                                'current_inventory': max(0, inv[i] - doli[i]),
+                                'competitors_prices': new,
+                            }
+
+                            firms[i].cache_experience(prev_state, idxs[i], pi[i], new_state)
+                            # firms[i].cache_experience(prev_state, idxs[i], (pi_inv[i], pi_price[i]), new_state)
+
+                    # for i in range(n):
+                    #     x_t[i] = max(0, inv[i] - doli[i])
+                    x_t = np.maximum(0, inv - doli)
+                    
+                    mem = learn.copy()
+
+                    pbar.update(1)
+                    raw_profit_history.append(pi)
+                    raw_price_history.append(p)
+                    raw_stock_history.append(inv)
+                
+                if total_t < 0:
+                    total_t = 0
+                else:
+                    # print("-:"*40)
+                    for i in range(n):
+                        # print("Фирма:", i)
+                        firms[i].update()
+                    
+                    total_t = min(total_t + N_epochs, T)
+                
 
     elif str(firms[0]) == "PPO_C":
 
@@ -482,7 +584,10 @@ if VISUALIZE or SAVE:
             plotThird.set_xlabel('Итерация')
             plotThird.legend(loc = loc)
     
-    plot_name = f'T_{T}_n_{n}_model_{str(firms[0])}_MV_{MEMORY_VOLUME}_own_{own}_mode_{Environment["firm_params"]["mode"]}_profit_dynamic_{profit_dynamic}'
+    plot_name = f'T_{T}_n_{n}_model_{str(firms[0])}_MV_{MEMORY_VOLUME}_own_{own}_profit_dynamic_{profit_dynamic}'
+
+    if str(firms[0]) == "TN_DDQN":
+        plot_name = plot_name + f'_mode_{Environment["firm_params"]["mode"]}'
 
     if SAVE:
         plt.savefig(plot_name, dpi = 1000)
@@ -525,96 +630,6 @@ if SUMMARY:
 
 
 """
-Средняя цена по всем раундам: 1.6830796000000001 1.6826728
-Средняя прибыль по всем раундам: 0.261182733098004 0.2620053694533933
-n = 2, ENV = 100, T = 100000, mode = "zhou", MEMORY_VOLUME = 1, own = False
-
-
-Средняя цена по всем раундам: 1.7535228999999999 1.7510052999999999 1.7533135
-Средняя прибыль по всем раундам: 0.12345687961002637 0.12364908988203568 0.12292997137728587
-n = 3, eps = 0.9, ENV = 100, T = 100000, mode = "zhou", MEMORY_VOLUME = 1, own = False
-
-
-Средняя цена по последним 500 раундов: 1.623 1.627
-Среднии запасы по последним 500 раундов: 12.402 12.399
-Средняя прибыль по последним 500 раундов: 0.457 0.205
-----------------------------------------
-Теоретические цены: 1.473 1.925
-Теоретические инв. в запасы: 14.141 10.946
-Теоретические прибыли: 6.687 10.125
-----------------------------------------
-Индекс сговора по цене: 33.7%
-Индекс сговора по запасам: 54.49%
-Индекс сговора по прибыли: -184.93%
-
-{'T': 10000,
-'ENV': 100,
-'n': 2,
-'m': 5,
-'delta': 0.95,
-'gamma': 0.5,
-'c_i': 1,
-'h_plus': 3,
-'v_minus': 3,
-'eta': 0.05,
-'color': ['#FF7F00', '#1874CD', '#548B54', '#CD2626', '#CDCD00'],
-'profit_dynamic': 'compare',
-'loc': 'lower left',
-'VISUALIZE_THEORY': True,
-'VISUALIZE': True,
-'SAVE': False,
-'SUMMARY': True,
-'p_inf': 1,
-'p_sup': 2.5,
-'arms_amo_price': 101,
-'arms_amo_inv': 101,
-'demand_params': {'n': 2, 'mode': 'logit', 'a': 2, 'mu': 0.25, 'C': 30},
-'prices': array([1.   , 1.015, 1.03 , 1.045, 1.06 , 1.075, 1.09 , 1.105, 1.12 ,
-       1.135, 1.15 , 1.165, 1.18 , 1.195, 1.21 , 1.225, 1.24 , 1.255,
-       1.27 , 1.285, 1.3  , 1.315, 1.33 , 1.345, 1.36 , 1.375, 1.39 ,
-       1.405, 1.42 , 1.435, 1.45 , 1.465, 1.48 , 1.495, 1.51 , 1.525,
-       1.54 , 1.555, 1.57 , 1.585, 1.6  , 1.615, 1.63 , 1.645, 1.66 ,
-       1.675, 1.69 , 1.705, 1.72 , 1.735, 1.75 , 1.765, 1.78 , 1.795,
-       1.81 , 1.825, 1.84 , 1.855, 1.87 , 1.885, 1.9  , 1.915, 1.93 ,
-       1.945, 1.96 , 1.975, 1.99 , 2.005, 2.02 , 2.035, 2.05 , 2.065,
-       2.08 , 2.095, 2.11 , 2.125, 2.14 , 2.155, 2.17 , 2.185, 2.2  ,
-       2.215, 2.23 , 2.245, 2.26 , 2.275, 2.29 , 2.305, 2.32 , 2.335,
-       2.35 , 2.365, 2.38 , 2.395, 2.41 , 2.425, 2.44 , 2.455, 2.47 ,
-       2.485, 2.5  ]),
-'inventory': array([ 0. ,  0.3,  0.6,  0.9,  1.2,  1.5,  1.8,  2.1,  2.4,  2.7,  3. ,
-        3.3,  3.6,  3.9,  4.2,  4.5,  4.8,  5.1,  5.4,  5.7,  6. ,  6.3,
-        6.6,  6.9,  7.2,  7.5,  7.8,  8.1,  8.4,  8.7,  9. ,  9.3,  9.6,
-        9.9, 10.2, 10.5, 10.8, 11.1, 11.4, 11.7, 12. , 12.3, 12.6, 12.9,
-       13.2, 13.5, 13.8, 14.1, 14.4, 14.7, 15. , 15.3, 15.6, 15.9, 16.2,
-       16.5, 16.8, 17.1, 17.4, 17.7, 18. , 18.3, 18.6, 18.9, 19.2, 19.5,
-       19.8, 20.1, 20.4, 20.7, 21. , 21.3, 21.6, 21.9, 22.2, 22.5, 22.8,
-       23.1, 23.4, 23.7, 24. , 24.3, 24.6, 24.9, 25.2, 25.5, 25.8, 26.1,
-       26.4, 26.7, 27. , 27.3, 27.6, 27.9, 28.2, 28.5, 28.8, 29.1, 29.4,
-       29.7, 30. ]),
-'firm_model': <class 'firms_RL.TN_DDQN>,
-'firm_params': {'state_dim': 2, 'inventory_actions': array([ 0. ,  0.3,  0.6,  0.9,  1.2,  1.5,  1.8,  2.1,  2.4,  2.7,  3. ,
-        3.3,  3.6,  3.9,  4.2,  4.5,  4.8,  5.1,  5.4,  5.7,  6. ,  6.3,
-        6.6,  6.9,  7.2,  7.5,  7.8,  8.1,  8.4,  8.7,  9. ,  9.3,  9.6,
-        9.9, 10.2, 10.5, 10.8, 11.1, 11.4, 11.7, 12. , 12.3, 12.6, 12.9,
-       13.2, 13.5, 13.8, 14.1, 14.4, 14.7, 15. , 15.3, 15.6, 15.9, 16.2,
-       16.5, 16.8, 17.1, 17.4, 17.7, 18. , 18.3, 18.6, 18.9, 19.2, 19.5,
-       19.8, 20.1, 20.4, 20.7, 21. , 21.3, 21.6, 21.9, 22.2, 22.5, 22.8,
-       23.1, 23.4, 23.7, 24. , 24.3, 24.6, 24.9, 25.2, 25.5, 25.8, 26.1,
-       26.4, 26.7, 27. , 27.3, 27.6, 27.9, 28.2, 28.5, 28.8, 29.1, 29.4,
-       29.7, 30. ]), 'price_actions': array([1.   , 1.015, 1.03 , 1.045, 1.06 , 1.075, 1.09 , 1.105, 1.12 ,
-       1.135, 1.15 , 1.165, 1.18 , 1.195, 1.21 , 1.225, 1.24 , 1.255,
-       1.27 , 1.285, 1.3  , 1.315, 1.33 , 1.345, 1.36 , 1.375, 1.39 ,
-       1.405, 1.42 , 1.435, 1.45 , 1.465, 1.48 , 1.495, 1.51 , 1.525,
-       1.54 , 1.555, 1.57 , 1.585, 1.6  , 1.615, 1.63 , 1.645, 1.66 ,
-       1.675, 1.69 , 1.705, 1.72 , 1.735, 1.75 , 1.765, 1.78 , 1.795,
-       1.81 , 1.825, 1.84 , 1.855, 1.87 , 1.885, 1.9  , 1.915, 1.93 ,
-       1.945, 1.96 , 1.975, 1.99 , 2.005, 2.02 , 2.035, 2.05 , 2.065,
-       2.08 , 2.095, 2.11 , 2.125, 2.14 , 2.155, 2.17 , 2.185, 2.2  ,
-       2.215, 2.23 , 2.245, 2.26 , 2.275, 2.29 , 2.305, 2.32 , 2.335,
-       2.35 , 2.365, 2.38 , 2.395, 2.41 , 2.425, 2.44 , 2.455, 2.47 ,
-       2.485, 2.5  ]), 'MEMORY_VOLUME': 1, 'batch_size': 32, 'gamma': 0.95, 'lr': 0.0001, 'eps': 0.4, 'mode': 'zhou', 'target_update_freq': 100, 'memory_size': 1000}, 'own': False}
-
-
 Средняя цена по последним 5000 раундов: 1.513 1.491
 Среднии запасы по последним 5000 раундов: 13.248 14.401
 Средняя прибыль по последним 5000 раундов: 4.625 4.818
@@ -670,4 +685,4 @@ n = 3, eps = 0.9, ENV = 100, T = 100000, mode = "zhou", MEMORY_VOLUME = 1, own =
        2.35 , 2.365, 2.38 , 2.395, 2.41 , 2.425, 2.44 , 2.455, 2.47 ,
        2.485, 2.5  ]), 'MEMORY_VOLUME': 1, 'batch_size': 32, 'gamma': 0.95, 'lr': 0.0001, 'eps': 0.4, 'mode': 'zhou', 'target_update_freq': 100, 'memory_size': 1000}, 'own': False}
 """
-print("\n", Environment)
+# print("\n", Environment)
