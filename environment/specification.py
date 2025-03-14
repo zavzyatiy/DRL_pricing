@@ -9,7 +9,7 @@ import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from firms_RL import epsilon_greedy, TQL, TN_DDQN, PPO_D, PPO_C, PPO_D_CriticNet
+from firms_RL import epsilon_greedy, TQL, TN_DDQN, PPO_D, PPO_C
 
 ### Всевозможные модели спросов
 class demand_function:

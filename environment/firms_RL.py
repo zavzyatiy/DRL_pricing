@@ -554,9 +554,14 @@ class PPO_D:
 
     def _get_state_vector(self, firm_state):
         """Преобразует состояние фирмы в тензор"""
-        inventory = firm_state['current_inventory']
-        comp_prices = np.array(firm_state['competitors_prices']).flatten()
-        return torch.tensor([inventory] + comp_prices.tolist(), dtype=self.dtype, device=self.device)
+        if not self.cuda_usage:
+            inventory = firm_state['current_inventory']
+            comp_prices = np.array(firm_state['competitors_prices']).flatten()
+            return torch.tensor([inventory] + comp_prices.tolist(), dtype=self.dtype, device=self.device)
+        else:
+            inventory = firm_state['current_inventory']
+            comp_prices = np.array(firm_state['competitors_prices']).flatten()
+            return torch.tensor([inventory] + comp_prices.tolist(), dtype=self.dtype, device=self.device)
 
 
     def suggest_actions(self, firm_state):
@@ -578,7 +583,7 @@ class PPO_D:
 
         # print("Вероятность выбора объема:", inv_prob[sampled_inv_index])
 
-        return (sampled_inv_index, sampled_prc_index)
+        return (sampled_inv_index.item(), sampled_prc_index.item())
 
 
     def cache_experience(self, state, actions, reward, next_state):
@@ -599,10 +604,10 @@ class PPO_D:
                 ))
             else:
                 self.memory.append((
-                    state_vec,
+                    state_vec.cpu(),
                     actions,
                     torch.tensor([reward], dtype = self.dtype).to(self.device),
-                    next_vec,
+                    next_vec.cpu(),
                 ))
 
 

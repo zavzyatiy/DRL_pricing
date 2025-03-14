@@ -347,8 +347,10 @@ for env in range(ENV):
                         if t >= 0:
                             idxs_i = firms[i].suggest_actions(firm_state)
                         else:
-                            idxs_i = (torch.LongTensor(random.sample([i for i in range(len(inventory))], 1)),
-                                      torch.LongTensor(random.sample([i for i in range(len(prices))], 1)))
+                            # idxs_i = (torch.LongTensor(random.sample([i for i in range(len(inventory))], 1)),
+                            #           torch.LongTensor(random.sample([i for i in range(len(prices))], 1)))
+                            idxs_i = (random.sample([i for i in range(len(inventory))], 1)[0],
+                                      random.sample([i for i in range(len(prices))], 1)[0])
                         # print("Действия", idxs_i)
                         idxs.append(idxs_i)
 
