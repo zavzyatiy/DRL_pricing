@@ -173,14 +173,45 @@ e4 = {
     },
     "own": own,
 }
+##########################
+### PPO-D
+##########################
+# e4 = {
+#     "prices": prices,
+#     "inventory": inventory,
+#     "firm_model": TN_DDQN,
+#     "firm_params": {
+#         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+#         "inventory_actions": inventory,
+#         "price_actions": prices,
+#         "MEMORY_VOLUME": MEMORY_VOLUME,
+#         "batch_size": 32, # 32
+#         "gamma": e1["delta"],
+#         "lr": 0.0001,
+#         "eps": 0.4,
+#         "mode": "zhou", # None, "sanchez_cartas", "zhou"
+#         "target_update_freq": 100, # e1["T"]//100, 100
+#         "memory_size": 1000, # 10000
+#         "cuda_usage": True,
+#         "eps_min": 0.01,
+#         "eps_max": 1,
+#         "beta": 1.5/(10**4),
+#     },
+#     "own": own,
+# }
+##########################
+### PPO-C
+##########################
+
+##########################
+### SAC
+##########################
 
 e5 = {
 
 }
 
 Environment = e1 | e2 | e3 | e4 | e5
-
-# print(2*0.25 + 1.17498/2 + 1.17498/4)
 
 ### Архив возможных параметризаций алгоритмов для фирм:
 

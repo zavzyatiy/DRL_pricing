@@ -443,20 +443,221 @@ class TN_DDQN:
         return loss
 
 
-    def save(self, path):
-        """Сохранение модели"""
-        torch.save({
-            'model': self.online.state_dict(),
-            'exploration': self.eps,
-            'memory': self.memory
-        }, path)
+    # def save(self, path):
+    #     """Сохранение модели"""
+    #     torch.save({
+    #         'model': self.online.state_dict(),
+    #         'exploration': self.eps,
+    #         'memory': self.memory
+    #     }, path)
 
 
-    def load(self, path):
-        """Загрузка модели"""
-        checkpoint = torch.load(path)
-        self.online.load_state_dict(checkpoint['model'])
-        self.target.load_state_dict(checkpoint['model'])
-        self.eps = checkpoint.get('exploration', 1.0)
-        self.memory = checkpoint.get('memory', deque(maxlen=self.memory_size))
+    # def load(self, path):
+    #     """Загрузка модели"""
+    #     checkpoint = torch.load(path)
+    #     self.online.load_state_dict(checkpoint['model'])
+    #     self.target.load_state_dict(checkpoint['model'])
+    #     self.eps = checkpoint.get('exploration', 1.0)
+    #     self.memory = checkpoint.get('memory', deque(maxlen=self.memory_size))
+
+
+class PPO_D_ActorNet(nn.Module):
+
+    def __init__(self, input_dim, inventory_actions, price_actions):
+        super().__init__()
+        
+        sloy = 256
+        
+        self.online = nn.Sequential(
+            nn.Linear(input_dim, sloy),
+            nn.ReLU(),
+            nn.Linear(sloy, sloy),
+            nn.ReLU(),
+        )
+
+        self.inventory_size = len(inventory_actions)
+        self.price_size = len(price_actions)
+
+        self.inventory_head = nn.Linear(sloy, self.inventory_size)
+        self.price_head = nn.Linear(sloy, self.price_size)
+        
+        # Target network
+        self.target = deepcopy(self.online)
+        self.target_inventory = deepcopy(self.inventory_head)
+        self.target_price = deepcopy(self.price_head)
+
+        # Q_target parameters are frozen.
+        for p in self.target.parameters():
+            p.requires_grad = False
+        for p in self.target_inventory.parameters():
+            p.requires_grad = False
+        for p in self.target_price.parameters():
+            p.requires_grad = False
+
+    def forward(self, ):
+        
+        pass
+
+
+class PPO_D_CriticNet(nn.Module):
+
+    def __init__(self, input_dim, inventory_actions, price_actions):
+        super().__init__()
+        
+        sloy = 256
+        
+        self.online = nn.Sequential(
+            nn.Linear(input_dim, sloy),
+            nn.ReLU(),
+            nn.Linear(sloy, sloy),
+            nn.ReLU(),
+        )
+
+        self.inventory_size = len(inventory_actions)
+        self.price_size = len(price_actions)
+
+        self.inventory_head = nn.Linear(sloy, self.inventory_size)
+        self.price_head = nn.Linear(sloy, self.price_size)
+        
+        # Target network
+        self.target = deepcopy(self.online)
+        self.target_inventory = deepcopy(self.inventory_head)
+        self.target_price = deepcopy(self.price_head)
+
+        # Q_target parameters are frozen.
+        for p in self.target.parameters():
+            p.requires_grad = False
+        for p in self.target_inventory.parameters():
+            p.requires_grad = False
+        for p in self.target_price.parameters():
+            p.requires_grad = False
+
+    def forward(self, ):
+        
+        pass
+
+
+class PPO_D:
+    def __init__(
+            self, 
+            # state_dim: int,
+            # inventory_actions: list,
+            # price_actions: list,
+            # batch_size:int,
+            # MEMORY_VOLUME: int,
+            # gamma: float,
+            # lr: float,
+            # eps: float,
+            # mode: str,
+            # target_update_freq: int,
+            # memory_size: int,
+            # cuda_usage: bool,
+            # eps_min: float,
+            # eps_max: float,
+            # beta: float,
+            # dtype = torch.float32,
+            ):
+        
+        pass
+
+
+
+class PPO_C_ActorNet(nn.Module):
+
+    def __init__(self, input_dim, inventory_actions, price_actions):
+        super().__init__()
+        
+        sloy = 256
+        
+        self.online = nn.Sequential(
+            nn.Linear(input_dim, sloy),
+            nn.ReLU(),
+            nn.Linear(sloy, sloy),
+            nn.ReLU(),
+        )
+
+        self.inventory_size = len(inventory_actions)
+        self.price_size = len(price_actions)
+
+        self.inventory_head = nn.Linear(sloy, self.inventory_size)
+        self.price_head = nn.Linear(sloy, self.price_size)
+        
+        # Target network
+        self.target = deepcopy(self.online)
+        self.target_inventory = deepcopy(self.inventory_head)
+        self.target_price = deepcopy(self.price_head)
+
+        # Q_target parameters are frozen.
+        for p in self.target.parameters():
+            p.requires_grad = False
+        for p in self.target_inventory.parameters():
+            p.requires_grad = False
+        for p in self.target_price.parameters():
+            p.requires_grad = False
+
+    def forward(self, ):
+        
+        pass
+
+
+class PPO_C_CriticNet(nn.Module):
+
+    def __init__(self, input_dim, inventory_actions, price_actions):
+        super().__init__()
+        
+        sloy = 256
+        
+        self.online = nn.Sequential(
+            nn.Linear(input_dim, sloy),
+            nn.ReLU(),
+            nn.Linear(sloy, sloy),
+            nn.ReLU(),
+        )
+
+        self.inventory_size = len(inventory_actions)
+        self.price_size = len(price_actions)
+
+        self.inventory_head = nn.Linear(sloy, self.inventory_size)
+        self.price_head = nn.Linear(sloy, self.price_size)
+        
+        # Target network
+        self.target = deepcopy(self.online)
+        self.target_inventory = deepcopy(self.inventory_head)
+        self.target_price = deepcopy(self.price_head)
+
+        # Q_target parameters are frozen.
+        for p in self.target.parameters():
+            p.requires_grad = False
+        for p in self.target_inventory.parameters():
+            p.requires_grad = False
+        for p in self.target_price.parameters():
+            p.requires_grad = False
+
+    def forward(self, ):
+        
+        pass
+
+
+class PPO_C:
+    def __init__(
+            self, 
+            # state_dim: int,
+            # inventory_actions: list,
+            # price_actions: list,
+            # batch_size:int,
+            # MEMORY_VOLUME: int,
+            # gamma: float,
+            # lr: float,
+            # eps: float,
+            # mode: str,
+            # target_update_freq: int,
+            # memory_size: int,
+            # cuda_usage: bool,
+            # eps_min: float,
+            # eps_max: float,
+            # beta: float,
+            # dtype = torch.float32,
+            ):
+        
+        pass
 

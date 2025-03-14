@@ -21,7 +21,7 @@ torch.manual_seed(42)
 
 M = Environment["firm_model"]
 firm_params = Environment["firm_params"]
-TN_DDQN = int(int(str(M(**firm_params)) == "TN_DDQN"))
+HAS_INV = int(int(str(M(**firm_params)) in ["TN_DDQN", "PPO_D", "PPO_C", "SAC"]))
 
 ### количество итераций внутри среды
 T = Environment["T"]
@@ -51,7 +51,7 @@ p_inf = Environment["p_inf"]
 p_sup = Environment["p_sup"]
 # количество цен для перебора при
 # дискретизации пространства возможных цен
-if TN_DDQN == 1:
+if HAS_INV == 1:
     arms_amo_price = Environment["arms_amo_price"]
     arms_amo_inv = Environment["arms_amo_inv"]
 else:
@@ -75,7 +75,7 @@ loc = Environment["loc"]
 
 # Цены
 prices = Environment["prices"]
-if TN_DDQN == 1:
+if HAS_INV == 1:
     inventory = Environment["inventory"]
 
 # Дополнительные параметры, характерные для моделей
@@ -84,14 +84,14 @@ if str(M(**firm_params)) == "TQL":
     own = Environment["firm_params"]["own"]
     ONLY_OWN = Environment["firm_params"]["ONLY_OWN"]
 
-elif TN_DDQN == 1:
+elif HAS_INV == 1:
     MEMORY_VOLUME = Environment["firm_params"]["MEMORY_VOLUME"]
     batch_size = Environment["firm_params"]["batch_size"]
     own = Environment["own"]
 
 Price_history = []
 Profit_history = []
-if TN_DDQN == 1:
+if HAS_INV == 1:
     Stock_history = []
 
 demand_params = Environment["demand_params"]
@@ -105,7 +105,7 @@ for env in range(ENV):
 
     raw_price_history = []
     raw_profit_history = []
-    if TN_DDQN == 1:
+    if HAS_INV == 1:
         raw_stock_history = []
 
     ### Инициализация однородных фирм
@@ -114,7 +114,7 @@ for env in range(ENV):
 
     mem = []
 
-    if TN_DDQN == 1:
+    if HAS_INV == 1:
         x_t = np.array([0 for i in range(n)])
     
     ### Инициализация платформы
@@ -307,15 +307,27 @@ for env in range(ENV):
             raw_price_history.append(p)
             raw_stock_history.append(inv)
 
+    elif str(firms[0]) == "PPO_D":
+
+        continue
+
+    elif str(firms[0]) == "PPO_C":
+
+        continue
+
+    elif str(firms[0]) == "SAC":
+
+        continue
+
     raw_price_history = np.array(raw_price_history)
     raw_profit_history = np.array(raw_profit_history)
-    if TN_DDQN == 1:
+    if HAS_INV == 1:
         raw_stock_history = np.array(raw_stock_history)
 
     Price_history.append(tuple([np.mean(raw_price_history[-int(T/20):, i]) for i in range(n)]))
     Profit_history.append(tuple([np.mean(raw_profit_history[-int(T/20):, i]) for i in range(n)]))
     # print("\n", Price_history[-1])
-    if TN_DDQN == 1:
+    if HAS_INV == 1:
         Stock_history.append(tuple([np.mean(raw_stock_history[-int(T/20):, i]) for i in range(n)]))
         # print(Stock_history[-1])
     # print(Profit_history[-1])
@@ -325,11 +337,10 @@ for env in range(ENV):
 
 if VISUALIZE or SAVE:
 
-    sgladit = int(0.05 * T) # int(0.05 * T)
-    # profit_dynamic = TN_DDQN * "MA" + (1 - TN_DDQN) * profit_dynamic
-    fig, ax = plt.subplots(1 + TN_DDQN, 2 + (1 - TN_DDQN) * int(profit_dynamic == "compare"), figsize= (20, 5*(1 + TN_DDQN*1.1)))
+    sgladit = int(0.05 * T)
+    fig, ax = plt.subplots(1 + HAS_INV, 2 + (1 - HAS_INV) * int(profit_dynamic == "compare"), figsize= (20, 5*(1 + HAS_INV*1.1)))
 
-    if TN_DDQN == 0:
+    if HAS_INV == 0:
         plotFirst = ax[0]
         plotSecond = ax[1]
         if profit_dynamic == "compare":
@@ -370,7 +381,7 @@ if VISUALIZE or SAVE:
     plotFirst.set_xlabel('Итерация')
     plotFirst.legend(loc = loc)
 
-    if TN_DDQN == 1:
+    if HAS_INV == 1:
         ### Усреднение динамики запасов
         window_size = sgladit
         kernel = np.ones(window_size) / window_size
@@ -421,7 +432,7 @@ if VISUALIZE or SAVE:
         a = Environment["demand_params"]["a"]
         mu = Environment["demand_params"]["mu"]
 
-        if TN_DDQN == 0:
+        if HAS_INV == 0:
             zeros_column = a * np.ones((all_mv.shape[0], 1), dtype=all_mv.dtype)
             all_d = np.hstack((zeros_column, all_mv))
             all_d = np.exp((a-all_d)/mu)
@@ -467,7 +478,7 @@ if VISUALIZE or SAVE:
                 plotThird.plot([pi_M]*len(mv), c = "#6C7B8B", linestyle = "--")
 
             plotThird.set_title("Динамика прибылей")
-            plotThird.set_ylabel(f'Прибыль по сглаженной цене' + TN_DDQN*" и запасам")
+            plotThird.set_ylabel(f'Прибыль по сглаженной цене' + HAS_INV*" и запасам")
             plotThird.set_xlabel('Итерация')
             plotThird.legend(loc = loc)
     
@@ -489,7 +500,7 @@ if SUMMARY:
 
     print(f"Средняя цена по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Price_history[:, i]), 3)) for i in range(n)]))
 
-    if TN_DDQN == 1:
+    if HAS_INV == 1:
         Stock_history = np.array(Stock_history)
         # print(Stock_history)
         print(f"Среднии запасы по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)]))
@@ -499,7 +510,7 @@ if SUMMARY:
     print("-"*20*n)
     print("Теоретические цены:", round(p_NE , 3), round(p_M , 3))
 
-    if TN_DDQN == 1:
+    if HAS_INV == 1:
         print("Теоретические инв. в запасы:", round(inv_NE , 3), round(inv_M , 3))
 
     print("Теоретические прибыли:", round(pi_NE , 3), round(pi_M , 3))
@@ -507,7 +518,7 @@ if SUMMARY:
     print("-"*20*n)
     print("Индекс сговора по цене:", str(round(100 * (np.mean(Price_history) - p_NE)/(p_M - p_NE), 2)) + "%")
 
-    if TN_DDQN == 1:
+    if HAS_INV == 1:
         print("Индекс сговора по запасам:", str(round(100 * (np.mean(Stock_history) - inv_NE)/(inv_M - inv_NE), 2)) + "%")
 
     print("Индекс сговора по прибыли:", str(round(100 * (np.mean(Profit_history) - pi_NE)/(pi_M - pi_NE), 2)) + "%")
@@ -580,7 +591,7 @@ n = 3, eps = 0.9, ENV = 100, T = 100000, mode = "zhou", MEMORY_VOLUME = 1, own =
        23.1, 23.4, 23.7, 24. , 24.3, 24.6, 24.9, 25.2, 25.5, 25.8, 26.1,
        26.4, 26.7, 27. , 27.3, 27.6, 27.9, 28.2, 28.5, 28.8, 29.1, 29.4,
        29.7, 30. ]),
-'firm_model': <class 'firms_RL.TN_DDQN'>,
+'firm_model': <class 'firms_RL.TN_DDQN>,
 'firm_params': {'state_dim': 2, 'inventory_actions': array([ 0. ,  0.3,  0.6,  0.9,  1.2,  1.5,  1.8,  2.1,  2.4,  2.7,  3. ,
         3.3,  3.6,  3.9,  4.2,  4.5,  4.8,  5.1,  5.4,  5.7,  6. ,  6.3,
         6.6,  6.9,  7.2,  7.5,  7.8,  8.1,  8.4,  8.7,  9. ,  9.3,  9.6,
@@ -637,7 +648,7 @@ n = 3, eps = 0.9, ENV = 100, T = 100000, mode = "zhou", MEMORY_VOLUME = 1, own =
        19.8, 20.1, 20.4, 20.7, 21. , 21.3, 21.6, 21.9, 22.2, 22.5, 22.8,
        23.1, 23.4, 23.7, 24. , 24.3, 24.6, 24.9, 25.2, 25.5, 25.8, 26.1,
        26.4, 26.7, 27. , 27.3, 27.6, 27.9, 28.2, 28.5, 28.8, 29.1, 29.4,
-       29.7, 30. ]), 'firm_model': <class 'firms_RL.TN_DDQN'>, 'firm_params': {'state_dim': 2, 'inventory_actions': array([ 0. ,  0.3,  0.6,  0.9,  1.2,  1.5,  1.8,  2.1,  2.4,  2.7,  3. ,
+       29.7, 30. ]), 'firm_model': <class 'firms_RL.TN_DDQN>, 'firm_params': {'state_dim': 2, 'inventory_actions': array([ 0. ,  0.3,  0.6,  0.9,  1.2,  1.5,  1.8,  2.1,  2.4,  2.7,  3. ,
         3.3,  3.6,  3.9,  4.2,  4.5,  4.8,  5.1,  5.4,  5.7,  6. ,  6.3,
         6.6,  6.9,  7.2,  7.5,  7.8,  8.1,  8.4,  8.7,  9. ,  9.3,  9.6,
         9.9, 10.2, 10.5, 10.8, 11.1, 11.4, 11.7, 12. , 12.3, 12.6, 12.9,
