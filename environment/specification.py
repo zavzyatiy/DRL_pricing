@@ -197,7 +197,7 @@ ONLY_OWN = False
 #         "price_actions": prices,
 #         "batch_size": 100, # 32, 64, 128
 #         "N_epochs": 100, # e1["T"]//100
-#         "epochs": 10, # max(100, len(prices) + len(inventory))
+#         "epochs": 25, # max(100, len(prices) + len(inventory))
 #         "gamma": e1["delta"],
 #         "actor_lr": 0.00005,
 #         "critic_lr": 0.00005,
