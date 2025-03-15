@@ -8,6 +8,8 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import os
+import json
 
 from firms_RL import epsilon_greedy, TQL, TN_DDQN, PPO_D, PPO_C
 
@@ -78,7 +80,7 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 100000,
+    "T": 1000, # 100000
     "ENV": 1,
     "n": 2,
     "m": 5,
@@ -95,13 +97,19 @@ e1 = {
     "VISUALIZE": True,
     "SAVE": False,
     "SUMMARY": True,
+    "SHOW_PROM_RES": True,
+    "SAVE_SUMMARY": True,
+    "RANDOM_SEED": 42,
 }
+
+# Это чтобы я случайно не потерял все результаты симуляций
+e1["SAVE_SUMMARY"] = e1["SAVE_SUMMARY"] or ((e1["ENV"] >= 10) and (e1["T"] >= 10000))
 
 e2 = {
     "p_inf": e1["c_i"],
     "p_sup": 2.5,           # 2, 2.5
-    "arms_amo_price": 21,   # 101
-    "arms_amo_inv": 21,     # 101
+    "arms_amo_price": 101,   # 21, 101
+    "arms_amo_inv": 101,     # 21, 101
 }
 
 e3 = {
@@ -114,7 +122,7 @@ e3 = {
     },
 }
 
-mode = "D"
+mode = "D" # C, D
 
 if mode == "D":
     prices = np.linspace(e2["p_inf"], e2["p_sup"], e2["arms_amo_price"])
@@ -130,6 +138,7 @@ ONLY_OWN = False
 ##########################
 ### TQL
 ##########################
+# assert mode == "D"
 # e4 = {
 #     "prices": prices,
 #     "firm_model": TQL, # epsilon_greedy
@@ -150,6 +159,7 @@ ONLY_OWN = False
 ##########################
 ### TN_DDQN
 ##########################
+# assert mode == "D"
 # e4 = {
 #     "prices": prices,
 #     "inventory": inventory,
@@ -176,17 +186,43 @@ ONLY_OWN = False
 ##########################
 ### PPO-D
 ##########################
+# assert mode == "D"
+# e4 = {
+#     "prices": prices,
+#     "inventory": inventory,
+#     "firm_model": PPO_D,
+#     "firm_params": {
+#         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+#         "inventory_actions": inventory,
+#         "price_actions": prices,
+#         "batch_size": 100, # 32, 64, 128
+#         "N_epochs": 100, # e1["T"]//100
+#         "epochs": 10, # max(100, len(prices) + len(inventory))
+#         "gamma": e1["delta"],
+#         "actor_lr": 0.00005,
+#         "critic_lr": 0.00005,
+#         "clip_eps": 0.2,
+#         "lmbda": 0.95,
+#         "cuda_usage": True,
+#     },
+#     "MEMORY_VOLUME": MEMORY_VOLUME,
+#     "own": own,
+# }
+##########################
+### PPO-C
+##########################
+assert mode == "C"
 e4 = {
     "prices": prices,
     "inventory": inventory,
-    "firm_model": PPO_D,
+    "firm_model": PPO_C,
     "firm_params": {
         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
         "inventory_actions": inventory,
         "price_actions": prices,
         "batch_size": 100, # 32, 64, 128
         "N_epochs": 100, # e1["T"]//100
-        "epochs": 10, # max(100, len(prices) + len(inventory))
+        "epochs": 25, # max(100, len(prices) + len(inventory))
         "gamma": e1["delta"],
         "actor_lr": 0.00005,
         "critic_lr": 0.00005,
@@ -197,10 +233,6 @@ e4 = {
     "MEMORY_VOLUME": MEMORY_VOLUME,
     "own": own,
 }
-##########################
-### PPO-C
-##########################
-
 ##########################
 ### SAC
 ##########################

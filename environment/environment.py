@@ -10,17 +10,24 @@ import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from copy import deepcopy
+import os
+import json
 
 # from firms_RL import epsilon_greedy, TQL
 from specification import Environment, demand_function
 
 ### иницализация randomseed
-random.seed(42)
-np.random.seed(42)
-torch.manual_seed(42)
+RANDOM_SEED = Environment["RANDOM_SEED"]
+random.seed(RANDOM_SEED)
+np.random.seed(RANDOM_SEED)
+torch.manual_seed(RANDOM_SEED)
 
+# Инициализация типа модели
 M = Environment["firm_model"]
 firm_params = Environment["firm_params"]
+# Используем ли мы постановку задачи с инвестициями в запасы?
+# Модели сопряжены с ней автоматически, так как в работе
+# других ситуаций не рассматривается
 HAS_INV = int(str(M(**firm_params)) in ["TN_DDQN", "PPO_D", "PPO_C", "SAC"])
 
 ### количество итераций внутри среды
@@ -70,6 +77,11 @@ VISUALIZE_THEORY = Environment["VISUALIZE_THEORY"]
 SAVE = Environment["SAVE"]
 # Выводить итоговую информацию о симуляциях?
 SUMMARY = Environment["SUMMARY"]
+# Сохранять ли итоговую информацию?
+SAVE_SUMMARY = Environment["SAVE_SUMMARY"]
+SUMMARY = SUMMARY or SAVE_SUMMARY
+# Выводить ли итоги записей каждой среды?
+SHOW_PROM_RES = Environment["SHOW_PROM_RES"]
 # С какой стороны отображать легенду на графиках
 loc = Environment["loc"]
 
@@ -88,6 +100,13 @@ elif str(M(**firm_params)) == "TN_DDQN":
     batch_size = Environment["firm_params"]["batch_size"]
     own = Environment["own"]
 elif str(M(**firm_params)) == "PPO_D":
+    MEMORY_VOLUME = Environment["MEMORY_VOLUME"]
+    own = Environment["own"]
+    batch_size = Environment["firm_params"]["batch_size"]
+    N_epochs = Environment["firm_params"]["N_epochs"]
+    epochs = Environment["firm_params"]["epochs"]
+    assert (N_epochs >= batch_size) # and (N_epochs >= epochs)
+elif str(M(**firm_params)) == "PPO_C":
     MEMORY_VOLUME = Environment["MEMORY_VOLUME"]
     own = Environment["own"]
     batch_size = Environment["firm_params"]["batch_size"]
@@ -415,10 +434,108 @@ for env in range(ENV):
                     
                     total_t = min(total_t + N_epochs, T)
                 
-
     elif str(firms[0]) == "PPO_C":
+        total_t = -MEMORY_VOLUME
+        with tqdm(total = T + MEMORY_VOLUME, desc=f'Раунд {env + 1}') as pbar:
+            while total_t < T:
+                # for t in tqdm(range(- MEMORY_VOLUME - batch_size, T), f"Раунд {env + 1}"):
+                if total_t < 0:
+                    min_t = total_t
+                    max_t = 0
+                else:
+                    min_t = total_t
+                    max_t = min(total_t + N_epochs, T)
+                
+                for t in range(min_t, max_t):
 
-        continue
+                    # print("!!!", t)
+
+                    acts = []
+                    # print("ЗАПАСЫ", x_t)
+                    for i in range(n):
+                        # print("Фирма:", i)
+                        state_i = mem.copy()
+
+                        if len(state_i) == MEMORY_VOLUME and not(own):
+                            for j in range(MEMORY_VOLUME):
+                                state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
+                        
+                        firm_state = {
+                            'current_inventory': x_t[i],
+                            'competitors_prices': state_i,
+                        }
+
+                        if t >= 0:
+                            acts_i = firms[i].suggest_actions(firm_state)
+                        else:
+                            u_inv = torch.distributions.Normal(0, 1).sample()
+                            u_prc = torch.distributions.Normal(0, 1).sample()
+                            act_inv = firm_state[0] + torch.sigmoid(u_inv) * (inventory[1] - firm_state[0])
+                            act_price = prices[0] + torch.sigmoid(u_prc) * (prices[1] - prices[0])
+                            acts_i = (act_inv, act_price)
+                        # print("Действия", idxs_i)
+                        acts.append(acts_i)
+
+                    learn = mem.copy()
+
+                    if len(learn) < MEMORY_VOLUME:
+                        learn.append([x[1] for x in idxs])
+                    else:
+                        learn = learn[1:] + [[x[1] for x in idxs]]
+                    
+                    inv = np.array([x[0] for x in idxs])
+                    p = np.array([x[1] for x in idxs])
+
+                    doli = spros.distribution(p)
+
+                    pi = p * doli - c_i * (inv - np.array(x_t)) - h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
+                    # print("-"*50)
+                    # print("Итерация", t, total_t)
+                    if len(learn) == MEMORY_VOLUME:
+                        for i in range(n):
+                            state_i = mem.copy()
+                            if len(state_i) == MEMORY_VOLUME and not(own):
+                                for j in range(MEMORY_VOLUME):
+                                    state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
+                            
+                            new = learn.copy()
+                            if len(new) == MEMORY_VOLUME and not(own):
+                                for j in range(MEMORY_VOLUME):
+                                    new[j] = new[j][: i] + new[j][i + 1 :]
+                            
+                            prev_state = {
+                                'current_inventory': x_t[i],
+                                'competitors_prices': state_i,
+                            }
+
+                            new_state = {
+                                'current_inventory': max(0, inv[i] - doli[i]),
+                                'competitors_prices': new,
+                            }
+
+                            firms[i].cache_experience(prev_state, idxs[i], pi[i], new_state)
+                            # print(f"Память фирмы {i}", firms[i].memory)
+                            
+                    # for i in range(n):
+                    #     x_t[i] = max(0, inv[i] - doli[i])
+                    x_t = np.maximum(0, inv - doli)
+                    
+                    mem = learn.copy()
+
+                    pbar.update(1)
+                    raw_profit_history.append(pi)
+                    raw_price_history.append(p)
+                    raw_stock_history.append(inv)
+                
+                if total_t < 0:
+                    total_t = 0
+                else:
+                    # print("#"*50)
+                    for i in range(n):
+                        # print("Обновление фирмы", i)
+                        firms[i].update()
+                    
+                    total_t = min(total_t + N_epochs, T)
 
     elif str(firms[0]) == "SAC":
 
@@ -431,13 +548,15 @@ for env in range(ENV):
 
     Price_history.append(tuple([np.mean(raw_price_history[-int(T/20):, i]) for i in range(n)]))
     Profit_history.append(tuple([np.mean(raw_profit_history[-int(T/20):, i]) for i in range(n)]))
-    print("\n", Price_history[-1])
+    if SHOW_PROM_RES:
+        print("\n", Price_history[-1])
     if HAS_INV == 1:
         Stock_history.append(tuple([np.mean(raw_stock_history[-int(T/20):, i]) for i in range(n)]))
         print(Stock_history[-1])
-    print(Profit_history[-1])
-    print("-"*100)
-    print("\n")
+    if SHOW_PROM_RES:
+        print(Profit_history[-1])
+        print("-"*100)
+        print("\n")
 
 
 if VISUALIZE or SAVE:
@@ -586,31 +705,17 @@ if VISUALIZE or SAVE:
             plotThird.set_ylabel(f'Прибыль по сглаженной цене' + HAS_INV*" и запасам")
             plotThird.set_xlabel('Итерация')
             plotThird.legend(loc = loc)
-    
-    plot_name = f'T_{T}_n_{n}_model_{str(firms[0])}_MV_{MEMORY_VOLUME}_own_{own}_profit_dynamic_{profit_dynamic}'
-
-    if str(firms[0]) == "TN_DDQN":
-        plot_name = plot_name + f'_mode_{Environment["firm_params"]["mode"]}'
-
-    if SAVE:
-        plt.savefig(plot_name, dpi = 1000)
-
-    if VISUALIZE:
-        plt.show()
 
 
 if SUMMARY:
     print("\n")
     Price_history = np.array(Price_history)
     Profit_history = np.array(Profit_history)
-    # print(Price_history)
-    # print(Profit_history)
 
     print(f"Средняя цена по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Price_history[:, i]), 3)) for i in range(n)]))
 
     if HAS_INV == 1:
         Stock_history = np.array(Stock_history)
-        # print(Stock_history)
         print(f"Среднии запасы по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)]))
 
     print(f"Средняя прибыль по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)]))
@@ -630,6 +735,98 @@ if SUMMARY:
         print("Индекс сговора по запасам:", str(round(100 * (np.mean(Stock_history) - inv_NE)/(inv_M - inv_NE), 2)) + "%")
 
     print("Индекс сговора по прибыли:", str(round(100 * (np.mean(Profit_history) - pi_NE)/(pi_M - pi_NE), 2)) + "%")
+
+
+def convert_ndarray_to_list(obj):
+    if isinstance(obj, dict):
+        return {key: convert_ndarray_to_list(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_ndarray_to_list(item) for item in obj]
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    else:
+        return obj
+
+
+if SAVE_SUMMARY or VISUALIZE:
+    if VISUALIZE and not(SAVE_SUMMARY):
+
+        plot_name = f'T_{T}_n_{n}_model_{str(firms[0])}_MV_{MEMORY_VOLUME}_own_{own}_profit_dynamic_{profit_dynamic}'
+
+        if str(firms[0]) == "TN_DDQN":
+            plot_name = plot_name + f'_mode_{Environment["firm_params"]["mode"]}'
+
+        if SAVE:
+            plt.savefig(plot_name, dpi = 1000)
+    
+    if SAVE_SUMMARY:
+        folders = []
+        for f in os.listdir("./DRL_pricing/environment/simulation_results/"):
+            if not("." in str(f)) and (str(firms[0]) in str(f)):
+                folders.append(f)
+        
+        res_name = f"./DRL_pricing/environment/simulation_results/{str(firms[0])}_{len(folders) + 1}/"
+        
+        if not os.path.exists(res_name):
+            os.makedirs(res_name)
+
+        with open(res_name + "params.txt", "w+", encoding="utf-8") as f:
+            to_write = deepcopy(Environment)
+            to_write["firm_model"] = str(firms[0])
+            to_write = convert_ndarray_to_list(to_write)
+            json.dump(to_write, f, indent=4)
+        
+        path = os.path.join(res_name, "Price_history.npy")
+        np.save(path, Price_history)
+        path = os.path.join(res_name, "Profit_history.npy")
+        np.save(path, Profit_history)
+        if HAS_INV == 1:
+            path = os.path.join(res_name, "Stock_history.npy")
+            np.save(path, Stock_history)
+
+        with open(res_name + "summary.txt", "w+", encoding="utf-8") as f:
+            A = ""
+            A = A + f"Средняя цена по последним {int(T/20)} раундов: " + " ".join([str(round(np.mean(Price_history[:, i]), 3)) for i in range(n)])
+            A = A + "\n"
+            if HAS_INV == 1:
+                A = A + f"Среднии запасы по последним {int(T/20)} раундов: " + " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)])
+                A = A + "\n"
+
+            A = A + f"Средняя прибыль по последним {int(T/20)} раундов: " + " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)])
+            A = A + "\n"
+
+            A = A + "-"*20*n
+            A = A + "\n"
+            A = A + "Теоретические цены: " + f"{round(p_NE , 3)}, {round(p_M , 3)}"
+            A = A + "\n"
+
+            if HAS_INV == 1:
+                A = A + "Теоретические инв. в запасы: " + f"{round(inv_NE , 3)}, {round(inv_M , 3)}"
+                A = A + "\n"
+
+            A = A + "Теоретические прибыли: " + f"{round(pi_NE , 3)}, {round(pi_M , 3)}"
+            A = A + "\n"
+
+            A = A + "-"*20*n
+            A = A + "\n"
+            A = A + "Индекс сговора по цене: " + str(round(100 * (np.mean(Price_history) - p_NE)/(p_M - p_NE), 2)) + "%"
+            A = A + "\n"
+
+            if HAS_INV == 1:
+                A = A + "Индекс сговора по запасам: " + str(round(100 * (np.mean(Stock_history) - inv_NE)/(inv_M - inv_NE), 2)) + "%"
+                A = A + "\n"
+
+            A = A + "Индекс сговора по прибыли: " + str(round(100 * (np.mean(Profit_history) - pi_NE)/(pi_M - pi_NE), 2)) + "%"
+            A = A + "\n"
+            f.write(A)
+
+        if VISUALIZE and SAVE_SUMMARY:
+            if SAVE:
+                plt.savefig(plot_name, dpi = 1000)
+
+
+if VISUALIZE:
+    plt.show()
 
 
 """

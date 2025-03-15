@@ -11,13 +11,12 @@ import torch
 from torch.distributions.categorical import Categorical
 import torch.nn.functional as F
 import random
-import torch.optim as optim
 from copy import deepcopy
-from collections import deque
 
-random.seed(42)
-np.random.seed(42)
-torch.manual_seed(42)
+RANDOM_SEED = 42
+random.seed(RANDOM_SEED)
+np.random.seed(RANDOM_SEED)
+torch.manual_seed(RANDOM_SEED)
 
 
 """
@@ -442,11 +441,10 @@ class TN_DDQN:
 
 
 class PPO_D_ActorNet(nn.Module):
-
     def __init__(self, input_dim, inventory_actions, price_actions):
         super().__init__()
         
-        sloy = 64 # 256
+        sloy = 256 # 256
         
         self.d_actor_net = nn.Sequential(
             nn.Linear(input_dim, sloy),
@@ -470,11 +468,10 @@ class PPO_D_ActorNet(nn.Module):
 
 
 class PPO_D_CriticNet(nn.Module):
-
     def __init__(self, input_dim):
         super().__init__()
         
-        sloy = 64 # 256
+        sloy = 256 # 256
         
         self.d_critic_net = nn.Sequential(
             nn.Linear(input_dim, sloy),
@@ -501,7 +498,6 @@ def compute_advantage(gamma, lmbda, td_delta):
 
 
 class PPO_D:
-
     def __init__(
             self, 
             state_dim: int,
@@ -550,7 +546,7 @@ class PPO_D:
 
 
     def __repr__(self):
-        return "PPO_D"    
+        return "PPO_D"
 
 
     def _get_state_vector(self, firm_state):
@@ -682,101 +678,217 @@ class PPO_D:
             
 
 class PPO_C_ActorNet(nn.Module):
-
-    def __init__(self, input_dim, inventory_actions, price_actions):
+    def __init__(self, input_dim):
         super().__init__()
         
-        sloy = 256
+        sloy = 256 # 256
         
-        self.online = nn.Sequential(
+        self.c_actor_net = nn.Sequential(
             nn.Linear(input_dim, sloy),
             nn.ReLU(),
             nn.Linear(sloy, sloy),
             nn.ReLU(),
         )
 
-        self.inventory_size = len(inventory_actions)
-        self.price_size = len(price_actions)
-
-        self.inventory_head = nn.Linear(sloy, self.inventory_size)
-        self.price_head = nn.Linear(sloy, self.price_size)
+        self.inventory_head_mu = nn.Linear(sloy, 1)
+        self.inventory_head_sigma = nn.Linear(sloy, 1)
+        self.price_head_mu = nn.Linear(sloy, 1)
+        self.price_head_sigma = nn.Linear(sloy, 1)
         
-        # Target network
-        self.target = deepcopy(self.online)
-        self.target_inventory = deepcopy(self.inventory_head)
-        self.target_price = deepcopy(self.price_head)
 
-        # Q_target parameters are frozen.
-        for p in self.target.parameters():
-            p.requires_grad = False
-        for p in self.target_inventory.parameters():
-            p.requires_grad = False
-        for p in self.target_price.parameters():
-            p.requires_grad = False
-
-    def forward(self, ):
-        
-        pass
+    def forward(self, x):
+        x = self.c_actor_net(x)
+        inv_mu, inv_sigma = self.inventory_head_mu(x), self.inventory_head_mu(x)
+        prc_mu, prc_sigma = self.price_head_mu(x), self.price_head_sigma(x)
+        inv_sigma, prc_sigma = F.softplus(inv_sigma), F.softplus(prc_sigma)
+        return (inv_mu, inv_sigma, prc_mu, prc_sigma)
 
 
 class PPO_C_CriticNet(nn.Module):
-
-    def __init__(self, input_dim, inventory_actions, price_actions):
+    def __init__(self, input_dim):
         super().__init__()
         
-        sloy = 256
+        sloy = 256 # 256
         
-        self.online = nn.Sequential(
+        self.d_critic_net = nn.Sequential(
             nn.Linear(input_dim, sloy),
             nn.ReLU(),
             nn.Linear(sloy, sloy),
             nn.ReLU(),
-        )
+            nn.Linear(sloy, 1)
+            )
 
-        self.inventory_size = len(inventory_actions)
-        self.price_size = len(price_actions)
 
-        self.inventory_head = nn.Linear(sloy, self.inventory_size)
-        self.price_head = nn.Linear(sloy, self.price_size)
-        
-        # Target network
-        self.target = deepcopy(self.online)
-        self.target_inventory = deepcopy(self.inventory_head)
-        self.target_price = deepcopy(self.price_head)
-
-        # Q_target parameters are frozen.
-        for p in self.target.parameters():
-            p.requires_grad = False
-        for p in self.target_inventory.parameters():
-            p.requires_grad = False
-        for p in self.target_price.parameters():
-            p.requires_grad = False
-
-    def forward(self, ):
-        
-        pass
+    def forward(self, x):
+        return self.d_critic_net(x)
 
 
 class PPO_C:
     def __init__(
             self, 
-            # state_dim: int,
-            # inventory_actions: list,
-            # price_actions: list,
-            # batch_size:int,
-            # MEMORY_VOLUME: int,
-            # gamma: float,
-            # lr: float,
-            # eps: float,
-            # mode: str,
-            # target_update_freq: int,
-            # memory_size: int,
-            # cuda_usage: bool,
-            # eps_min: float,
-            # eps_max: float,
-            # beta: float,
-            # dtype = torch.float32,
+            state_dim: int,
+            inventory_actions: list,
+            price_actions: list,
+            batch_size: int,
+            N_epochs: int,
+            gamma: float,
+            actor_lr: float,
+            critic_lr: float,
+            epochs: int,
+            clip_eps: float,
+            lmbda: float,
+            cuda_usage: bool,
+            dtype = torch.float32,
             ):
         
-        pass
+        self.state_dim = state_dim
+        self.inventory_actions = inventory_actions
+        self.price_actions = price_actions
+        self.cuda_usage = cuda_usage
 
+        if cuda_usage:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = torch.device("cpu")
+
+        self.dtype = dtype
+
+        # Actor and Critic networks
+        self.c_actor_net = PPO_C_ActorNet(state_dim).to(self.device)
+        self.c_critic_net = PPO_C_CriticNet(state_dim).to(self.device)
+        
+        # Hyperparameters
+        self.batch_size = batch_size
+        self.gamma = gamma
+        self.clip_eps = clip_eps
+        self.epochs = epochs
+        self.memory_size = N_epochs
+        self.lmbda = lmbda
+        self.memory = []
+        
+        self.actor_optimizer = torch.optim.Adam(self.c_actor_net.parameters(), lr=actor_lr)
+        self.critic_optimizer = torch.optim.Adam(self.c_critic_net.parameters(), lr=critic_lr)
+
+
+    def __repr__(self):
+        return "PPO_C"
+
+
+    def _get_state_vector(self, firm_state):
+        """Преобразует состояние фирмы в тензор"""
+        if not self.cuda_usage:
+            inventory = firm_state['current_inventory']
+            comp_prices = np.array(firm_state['competitors_prices']).flatten()
+            return torch.tensor([inventory] + comp_prices.tolist(), dtype=self.dtype, device=self.device)
+        else:
+            inventory = firm_state['current_inventory']
+            comp_prices = np.array(firm_state['competitors_prices']).flatten()
+            return torch.tensor([inventory] + comp_prices.tolist(), dtype=self.dtype, device=self.device)
+
+
+    def suggest_actions(self, firm_state):
+        """Возвращает действия (инвентарь, цену)"""
+        state = self._get_state_vector(firm_state)
+        
+        inv_mu, inv_sigma, prc_mu, prc_sigma = self.c_actor_net(state)
+        
+        u_inv = torch.distributions.Normal(inv_mu, inv_sigma).sample()
+        u_prc = torch.distributions.Normal(prc_mu, prc_sigma).sample()
+        inv = state[0] + torch.sigmoid(u_inv) * (self.inventory_actions[1] - state[0])
+        price = self.price_actions[0] + torch.sigmoid(u_prc) * (self.price_actions[1] - self.price_actions[0])
+
+        return (inv, price)
+
+
+    def cache_experience(self, state, actions, reward, next_state):
+        """Сохраняет опыт в replay buffer"""
+        state_vec = self._get_state_vector(state)
+        next_vec = self._get_state_vector(next_state)
+
+        if len(self.memory) >= self.memory_size:
+            self.memory.pop(0)
+        
+        if len(state_vec) == self.state_dim:
+            if not self.cuda_usage:
+                self.memory.append((
+                    state_vec,
+                    actions,
+                    reward,
+                    next_vec,
+                ))
+            else:
+                self.memory.append((
+                    state_vec.cpu(),
+                    actions,
+                    torch.tensor([reward], dtype = self.dtype).to(self.device),
+                    next_vec.cpu(),
+                ))
+
+
+    def update(self):
+        """Обновление модели на основе данных в памяти"""
+        if len(self.memory) < self.batch_size:
+            return 0.0
+        
+        if not self.cuda_usage:
+            all_states = torch.stack([x[0] for x in self.memory])
+            all_actions = torch.LongTensor([x[1] for x in self.memory])
+            all_rewards = torch.tensor([x[2] for x in self.memory], dtype = self.dtype).view(-1, 1)
+            all_next_states = torch.stack([x[3] for x in self.memory])
+        else:
+            all_states = torch.stack([x[0] for x in self.memory]).to(self.device)
+            all_actions = torch.LongTensor([x[1] for x in self.memory]).to(self.device)
+            all_rewards = torch.stack([x[2] for x in self.memory], dim = 1)[0].view(-1, 1).to(self.device)
+            all_next_states = torch.stack([x[3] for x in self.memory]).to(self.device)
+        
+        td_target = all_rewards + self.gamma * self.d_critic_net(all_next_states)
+        td_delta = td_target - self.d_critic_net(all_states)
+        advantage = compute_advantage(self.gamma, self.lmbda, td_delta.cpu()).to(self.device)
+        # print("all_rewards", all_rewards)
+        # print(td_delta)
+
+        with torch.no_grad():
+            all_raw_inv, all_raw_prc = self.d_actor_net(all_states)
+            mask_ = self.inventory_actions_tensor.unsqueeze(0) < all_states[:, 0].unsqueeze(1)
+            all_raw_inv[mask_] = -1e8
+
+            inv_prob = torch.softmax(all_raw_inv, dim = 1)
+            price_prob = torch.softmax(all_raw_prc, dim = 1)
+
+            old_inv_probs = inv_prob.gather(1, all_actions[:, 0].unsqueeze(1))
+            # print("Какая используется вероятность выбора объема", old_inv_probs)
+            old_price_probs = price_prob.gather(1, all_actions[:, 1].unsqueeze(1))
+
+        index_list = [i for i in range(len(self.memory))]
+
+        for _ in range(self.epochs):
+            # print("Итерация обновления", _)
+            batch = random.sample(index_list, self.batch_size)
+            states = all_states[batch]
+            actions = all_actions[batch]
+            local_advantage = advantage[batch]
+            
+            raw_inv, raw_prc = self.d_actor_net(states)
+            mask = self.inventory_actions_tensor.unsqueeze(0) < states[:, 0].unsqueeze(1)
+            raw_inv[mask] = -1e8
+
+            Prob_inv = torch.softmax(raw_inv, dim = 1)
+            Prob_price = torch.softmax(raw_prc, dim = 1)
+
+            inv_probs = Prob_inv.gather(1, actions[:, 0].unsqueeze(1))
+            price_probs = Prob_price.gather(1, actions[:, 1].unsqueeze(1))
+
+            ratio = (inv_probs * price_probs)/(old_inv_probs[batch] * old_price_probs[batch])
+            surr1 = ratio * local_advantage
+            surr2 = torch.clamp(ratio, 1 - self.clip_eps, 1 + self.clip_eps) * local_advantage
+            
+            actor_loss = -torch.mean(torch.min(surr1, surr2))
+            critic_loss = F.mse_loss(self.d_critic_net(states), td_target[batch].detach())
+
+            self.actor_optimizer.zero_grad()
+            self.critic_optimizer.zero_grad()
+            actor_loss.backward()
+            critic_loss.backward()
+            self.actor_optimizer.step()
+            self.critic_optimizer.step()
+            # print("#"*40)
