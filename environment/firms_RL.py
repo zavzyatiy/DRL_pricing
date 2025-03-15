@@ -572,7 +572,7 @@ class PPO_D:
         price_prob = torch.softmax(raw_prc, dim = 0)
         mask = self.inventory_actions_tensor.unsqueeze(0) < state[0]
 
-        raw_inv[mask[0]] = -float("inf")
+        raw_inv[mask[0]] = -1e8
         inv_prob = torch.softmax(raw_inv, dim = 0)
 
         # print("Распред. Inv", inv_prob)
@@ -627,15 +627,15 @@ class PPO_D:
             all_rewards = torch.stack([x[2] for x in self.memory], dim = 1)[0].view(-1, 1).to(self.device)
             all_next_states = torch.stack([x[3] for x in self.memory]).to(self.device)
         
-        # print("all_next_states", all_next_states, all_next_states.shape)
         td_target = all_rewards + self.gamma * self.d_critic_net(all_next_states)
         td_delta = td_target - self.d_critic_net(all_states)
         advantage = compute_advantage(self.gamma, self.lmbda, td_delta.cpu()).to(self.device)
+        print("advantage", advantage)
 
         with torch.no_grad():
             all_raw_inv, all_raw_prc = self.d_actor_net(all_states)
             mask_ = self.inventory_actions_tensor.unsqueeze(0) < all_states[:, 0].unsqueeze(1)
-            all_raw_inv[mask_] = -float('inf')
+            all_raw_inv[mask_] = -1e8
 
             inv_prob = torch.softmax(all_raw_inv, dim = 1)
             price_prob = torch.softmax(all_raw_prc, dim = 1)
@@ -647,6 +647,7 @@ class PPO_D:
         index_list = [i for i in range(len(self.memory))]
 
         for _ in range(self.epochs):
+            print("Итерация обновления", _)
             batch = random.sample(index_list, self.batch_size)
             states = all_states[batch]
             actions = all_actions[batch]
@@ -654,7 +655,7 @@ class PPO_D:
             
             raw_inv, raw_prc = self.d_actor_net(states)
             mask = self.inventory_actions_tensor.unsqueeze(0) < states[:, 0].unsqueeze(1)
-            raw_inv[mask] = -float('inf')
+            raw_inv[mask] = -1e8
 
             Prob_inv = torch.softmax(raw_inv, dim = 1)
             Prob_price = torch.softmax(raw_prc, dim = 1)
@@ -675,9 +676,8 @@ class PPO_D:
             critic_loss.backward()
             self.actor_optimizer.step()
             self.critic_optimizer.step()
+            print("#"*40)
             
-            
-
 
 class PPO_C_ActorNet(nn.Module):
 

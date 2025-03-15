@@ -78,11 +78,11 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 10000,
+    "T": 9,
     "ENV": 1,
     "n": 2,
     "m": 5,
-    "delta": 0.95,
+    "delta": 0.99, # 0.95, 0.99
     "gamma": 0.5,
     "c_i": 1, # 0.25, 1
     "h_plus": 3, # 1.17498/2, # Из Zhou: примерно половина монопольной цены
@@ -100,8 +100,8 @@ e1 = {
 e2 = {
     "p_inf": e1["c_i"],
     "p_sup": 2.5,           # 2, 2.5
-    "arms_amo_price": 101,   # 101
-    "arms_amo_inv": 101,     # 101
+    "arms_amo_price": 21,   # 101
+    "arms_amo_inv": 21,     # 101
 }
 
 e3 = {
@@ -180,18 +180,18 @@ e4 = {
     "prices": prices,
     "inventory": inventory,
     "firm_model": PPO_D,
-    "N_epochs": max(100, len(prices) + len(inventory)), # e1["T"]//100
+    "N_epochs": 3, # e1["T"]//100
     "firm_params": {
         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
         "inventory_actions": inventory,
         "price_actions": prices,
-        "batch_size": 32, # 32
-        "epochs": max(100, len(prices) + len(inventory)), # max(100, len(prices) + len(inventory))
+        "batch_size": 2, # 32, 64, 128
+        "epochs": 3, # max(100, len(prices) + len(inventory))
         "gamma": e1["delta"],
-        "actor_lr": 0.0001,
-        "critic_lr": 0.0001,
+        "actor_lr": 0.00005,
+        "critic_lr": 0.00005,
         "clip_eps": 0.2,
-        "lmbda": 0.9,
+        "lmbda": 0.95,
         "cuda_usage": True,
     },
     "MEMORY_VOLUME": MEMORY_VOLUME,
