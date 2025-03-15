@@ -78,11 +78,11 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 9,
+    "T": 100000,
     "ENV": 1,
     "n": 2,
     "m": 5,
-    "delta": 0.99, # 0.95, 0.99
+    "delta": 0.95, # 0.95, 0.99
     "gamma": 0.5,
     "c_i": 1, # 0.25, 1
     "h_plus": 3, # 1.17498/2, # Из Zhou: примерно половина монопольной цены
@@ -180,13 +180,13 @@ e4 = {
     "prices": prices,
     "inventory": inventory,
     "firm_model": PPO_D,
-    "N_epochs": 3, # e1["T"]//100
     "firm_params": {
         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
         "inventory_actions": inventory,
         "price_actions": prices,
-        "batch_size": 2, # 32, 64, 128
-        "epochs": 3, # max(100, len(prices) + len(inventory))
+        "batch_size": 100, # 32, 64, 128
+        "N_epochs": 100, # e1["T"]//100
+        "epochs": 10, # max(100, len(prices) + len(inventory))
         "gamma": e1["delta"],
         "actor_lr": 0.00005,
         "critic_lr": 0.00005,

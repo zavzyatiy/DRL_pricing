@@ -446,7 +446,7 @@ class PPO_D_ActorNet(nn.Module):
     def __init__(self, input_dim, inventory_actions, price_actions):
         super().__init__()
         
-        sloy = 256
+        sloy = 64 # 256
         
         self.d_actor_net = nn.Sequential(
             nn.Linear(input_dim, sloy),
@@ -474,7 +474,7 @@ class PPO_D_CriticNet(nn.Module):
     def __init__(self, input_dim):
         super().__init__()
         
-        sloy = 256
+        sloy = 64 # 256
         
         self.d_critic_net = nn.Sequential(
             nn.Linear(input_dim, sloy),
@@ -508,6 +508,7 @@ class PPO_D:
             inventory_actions: list,
             price_actions: list,
             batch_size: int,
+            N_epochs: int,
             gamma: float,
             actor_lr: float,
             critic_lr: float,
@@ -540,7 +541,7 @@ class PPO_D:
         self.gamma = gamma
         self.clip_eps = clip_eps
         self.epochs = epochs
-        self.memory_size = epochs
+        self.memory_size = N_epochs
         self.lmbda = lmbda
         self.memory = []
         
@@ -630,7 +631,8 @@ class PPO_D:
         td_target = all_rewards + self.gamma * self.d_critic_net(all_next_states)
         td_delta = td_target - self.d_critic_net(all_states)
         advantage = compute_advantage(self.gamma, self.lmbda, td_delta.cpu()).to(self.device)
-        print("advantage", advantage)
+        # print("all_rewards", all_rewards)
+        # print(td_delta)
 
         with torch.no_grad():
             all_raw_inv, all_raw_prc = self.d_actor_net(all_states)
@@ -647,7 +649,7 @@ class PPO_D:
         index_list = [i for i in range(len(self.memory))]
 
         for _ in range(self.epochs):
-            print("Итерация обновления", _)
+            # print("Итерация обновления", _)
             batch = random.sample(index_list, self.batch_size)
             states = all_states[batch]
             actions = all_actions[batch]
@@ -676,7 +678,7 @@ class PPO_D:
             critic_loss.backward()
             self.actor_optimizer.step()
             self.critic_optimizer.step()
-            print("#"*40)
+            # print("#"*40)
             
 
 class PPO_C_ActorNet(nn.Module):

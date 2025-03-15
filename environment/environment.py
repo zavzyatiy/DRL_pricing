@@ -91,7 +91,7 @@ elif str(M(**firm_params)) == "PPO_D":
     MEMORY_VOLUME = Environment["MEMORY_VOLUME"]
     own = Environment["own"]
     batch_size = Environment["firm_params"]["batch_size"]
-    N_epochs = Environment["N_epochs"]
+    N_epochs = Environment["firm_params"]["N_epochs"]
     epochs = Environment["firm_params"]["epochs"]
     assert (N_epochs >= batch_size) # and (N_epochs >= epochs)
 
@@ -367,8 +367,8 @@ for env in range(ENV):
                     doli = spros.distribution(p)
 
                     pi = p * doli - c_i * (inv - np.array(x_t)) - h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
-                    print("-"*50)
-                    print("Итерация", t, total_t)
+                    # print("-"*50)
+                    # print("Итерация", t, total_t)
                     if len(learn) == MEMORY_VOLUME:
                         for i in range(n):
                             state_i = mem.copy()
@@ -392,7 +392,7 @@ for env in range(ENV):
                             }
 
                             firms[i].cache_experience(prev_state, idxs[i], pi[i], new_state)
-                            print(f"Память фирмы {i}", firms[i].memory)
+                            # print(f"Память фирмы {i}", firms[i].memory)
                             
                     # for i in range(n):
                     #     x_t[i] = max(0, inv[i] - doli[i])
@@ -400,7 +400,7 @@ for env in range(ENV):
                     
                     mem = learn.copy()
 
-                    # pbar.update(1)
+                    pbar.update(1)
                     raw_profit_history.append(pi)
                     raw_price_history.append(p)
                     raw_stock_history.append(inv)
@@ -408,9 +408,9 @@ for env in range(ENV):
                 if total_t < 0:
                     total_t = 0
                 else:
-                    print("-"*50)
+                    # print("#"*50)
                     for i in range(n):
-                        print("Обновление фирмы", i)
+                        # print("Обновление фирмы", i)
                         firms[i].update()
                     
                     total_t = min(total_t + N_epochs, T)
@@ -688,4 +688,4 @@ if SUMMARY:
        2.35 , 2.365, 2.38 , 2.395, 2.41 , 2.425, 2.44 , 2.455, 2.47 ,
        2.485, 2.5  ]), 'MEMORY_VOLUME': 1, 'batch_size': 32, 'gamma': 0.95, 'lr': 0.0001, 'eps': 0.4, 'mode': 'zhou', 'target_update_freq': 100, 'memory_size': 1000}, 'own': False}
 """
-print("\n", Environment)
+# print("\n", Environment)
