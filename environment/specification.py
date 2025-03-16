@@ -80,8 +80,8 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 1000, # 100000
-    "ENV": 1,
+    "T": 200000, # 100000, 200000
+    "ENV": 20,
     "n": 2,
     "m": 5,
     "delta": 0.95, # 0.95, 0.99
@@ -122,7 +122,7 @@ e3 = {
     },
 }
 
-mode = "D" # C, D
+mode = "C" # C, D
 
 if mode == "D":
     prices = np.linspace(e2["p_inf"], e2["p_sup"], e2["arms_amo_price"])
@@ -195,9 +195,9 @@ ONLY_OWN = False
 #         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
 #         "inventory_actions": inventory,
 #         "price_actions": prices,
-#         "batch_size": 100, # 32, 64, 128
-#         "N_epochs": 100, # e1["T"]//100
-#         "epochs": 25, # max(100, len(prices) + len(inventory))
+#         "batch_size": 100, # 32, 64, 100, 128
+#         "N_epochs": 100, # 100, e1["T"]//100
+#         "epochs": 25, # 25
 #         "gamma": e1["delta"],
 #         "actor_lr": 0.00005,
 #         "critic_lr": 0.00005,
@@ -220,14 +220,14 @@ e4 = {
         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
         "inventory_actions": inventory,
         "price_actions": prices,
-        "batch_size": 100, # 32, 64, 128
-        "N_epochs": 100, # e1["T"]//100
-        "epochs": 25, # max(100, len(prices) + len(inventory))
+        "batch_size": 100, # 32, 64, 100, 128
+        "N_epochs": 100, # 100, 200, e1["T"]//100
+        "epochs": 25, # 25
         "gamma": e1["delta"],
-        "actor_lr": 0.00005,
-        "critic_lr": 0.00005,
+        "actor_lr": 0.000001,
+        "critic_lr": 0.000001,
         "clip_eps": 0.2,
-        "lmbda": 0.95,
+        "lmbda": 1,
         "cuda_usage": True,
     },
     "MEMORY_VOLUME": MEMORY_VOLUME,

@@ -366,8 +366,6 @@ for env in range(ENV):
                         if t >= 0:
                             idxs_i = firms[i].suggest_actions(firm_state)
                         else:
-                            # idxs_i = (torch.LongTensor(random.sample([i for i in range(len(inventory))], 1)),
-                            #           torch.LongTensor(random.sample([i for i in range(len(prices))], 1)))
                             idxs_i = (random.sample([i for i in range(len(inventory))], 1)[0],
                                       random.sample([i for i in range(len(prices))], 1)[0])
                         # print("Действия", idxs_i)
@@ -451,6 +449,7 @@ for env in range(ENV):
                     # print("!!!", t)
 
                     acts = []
+                    iter_probs = []
                     # print("ЗАПАСЫ", x_t)
                     for i in range(n):
                         # print("Фирма:", i)
@@ -466,25 +465,29 @@ for env in range(ENV):
                         }
 
                         if t >= 0:
-                            acts_i = firms[i].suggest_actions(firm_state)
+                            inv, price, u_inv, u_prc = firms[i].suggest_actions(firm_state)
+                            acts_i = (inv, price)
                         else:
                             u_inv = torch.distributions.Normal(0, 1).sample()
                             u_prc = torch.distributions.Normal(0, 1).sample()
-                            act_inv = firm_state[0] + torch.sigmoid(u_inv) * (inventory[1] - firm_state[0])
+                            act_inv = x_t[i] + torch.sigmoid(u_inv) * (inventory[1] - x_t[i])
                             act_price = prices[0] + torch.sigmoid(u_prc) * (prices[1] - prices[0])
                             acts_i = (act_inv, act_price)
-                        # print("Действия", idxs_i)
+                        # print("Фирма", i)
+                        # print("iter_probs", (u_inv, u_prc))
+                        iter_probs.append((u_inv, u_prc))
                         acts.append(acts_i)
 
                     learn = mem.copy()
 
                     if len(learn) < MEMORY_VOLUME:
-                        learn.append([x[1] for x in idxs])
+                        learn.append([x[1] for x in acts])
                     else:
-                        learn = learn[1:] + [[x[1] for x in idxs]]
+                        learn = learn[1:] + [[x[1] for x in acts]]
                     
-                    inv = np.array([x[0] for x in idxs])
-                    p = np.array([x[1] for x in idxs])
+                    inv = np.array([x[0] for x in acts])
+                    p = np.array([x[1] for x in acts])
+                    # print(p)
 
                     doli = spros.distribution(p)
 
@@ -513,7 +516,7 @@ for env in range(ENV):
                                 'competitors_prices': new,
                             }
 
-                            firms[i].cache_experience(prev_state, idxs[i], pi[i], new_state)
+                            firms[i].cache_experience(prev_state, iter_probs[i], pi[i], new_state)
                             # print(f"Память фирмы {i}", firms[i].memory)
                             
                     # for i in range(n):
@@ -822,7 +825,7 @@ if SAVE_SUMMARY or VISUALIZE:
 
         if VISUALIZE and SAVE_SUMMARY:
             if SAVE:
-                plt.savefig(plot_name, dpi = 1000)
+                plt.savefig(res_name + "plot_last_res", dpi = 1000)
 
 
 if VISUALIZE:
