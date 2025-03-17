@@ -470,8 +470,8 @@ for env in range(ENV):
                         else:
                             u_inv = torch.distributions.Normal(0, 1).sample()
                             u_prc = torch.distributions.Normal(0, 1).sample()
-                            act_inv = x_t[i] + torch.sigmoid(u_inv) * (inventory[1] - x_t[i])
-                            act_price = prices[0] + torch.sigmoid(u_prc) * (prices[1] - prices[0])
+                            act_inv = x_t[i] + torch.sigmoid(u_inv/10) * (inventory[1] - x_t[i])
+                            act_price = prices[0] + torch.sigmoid(u_prc/10) * (prices[1] - prices[0])
                             acts_i = (act_inv, act_price)
                         # print("Фирма", i)
                         # print("iter_probs", (u_inv, u_prc))

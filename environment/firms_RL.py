@@ -685,10 +685,10 @@ class PPO_C_ActorNet(nn.Module):
         
         self.c_actor_net = nn.Sequential(
             nn.Linear(input_dim, sloy),
-            # nn.LayerNorm(sloy),
+            nn.LayerNorm(sloy),
             nn.ReLU(),
             nn.Linear(sloy, sloy),
-            # nn.LayerNorm(sloy),
+            nn.LayerNorm(sloy),
             nn.ReLU(),
         )
 
@@ -702,10 +702,6 @@ class PPO_C_ActorNet(nn.Module):
         y = self.c_actor_net(x)
         inv_mu, inv_sigma = self.inventory_head_mu(y), self.inventory_head_sigma(y)
         prc_mu, prc_sigma = self.price_head_mu(y), self.price_head_sigma(y)
-        # assert not torch.isnan(inv_mu).any(), "inv_mu is NaN"
-        if torch.isnan(inv_mu).any():
-            print(x)
-        
         assert not torch.isnan(inv_mu).any(), "inv_mu is NaN"
         assert not torch.isnan(prc_mu).any(), "prc_mu is NaN"
         inv_sigma, prc_sigma = F.softplus(inv_sigma), F.softplus(prc_sigma)
@@ -720,10 +716,10 @@ class PPO_C_CriticNet(nn.Module):
         
         self.d_critic_net = nn.Sequential(
             nn.Linear(input_dim, sloy),
-            # nn.LayerNorm(sloy),
+            nn.LayerNorm(sloy),
             nn.ReLU(),
             nn.Linear(sloy, sloy),
-            # nn.LayerNorm(sloy),
+            nn.LayerNorm(sloy),
             nn.ReLU(),
             nn.Linear(sloy, 1)
             )
@@ -805,8 +801,8 @@ class PPO_C:
         
         u_inv = torch.distributions.Normal(inv_mu, inv_sigma).sample()
         u_prc = torch.distributions.Normal(prc_mu, prc_sigma).sample()
-        inv = state[0] + torch.sigmoid(u_inv).clamp(1e-4, 1-1e-4) * (self.inventory_actions[1] - state[0])
-        price = self.price_actions[0] + torch.sigmoid(u_prc).clamp(1e-4, 1-1e-4) * (self.price_actions[1] - self.price_actions[0])
+        inv = state[0] + torch.sigmoid(u_inv/10).clamp(1e-4, 1-1e-4) * (self.inventory_actions[1] - state[0])
+        price = self.price_actions[0] + torch.sigmoid(u_prc/10).clamp(1e-4, 1-1e-4) * (self.price_actions[1] - self.price_actions[0])
 
         return (inv.item(), price.item(), u_inv.item(), u_prc.item())
 
@@ -867,14 +863,14 @@ class PPO_C:
             # print("all_actions[:, 0]", all_actions[:, 0])
 
             old_inv_ln_probs = inv_dist.log_prob(all_actions[:, 0]).diagonal()
-            old_inv_ln_probs -= F.logsigmoid(all_actions[:, 0])
-            old_inv_ln_probs -= F.logsigmoid(-all_actions[:, 0])
-            old_inv_ln_probs -= torch.log(self.inventory_actions[1] - all_states[:, 0] + 1e-8)
+            # old_inv_ln_probs -= F.logsigmoid(all_actions[:, 0])
+            # old_inv_ln_probs -= F.logsigmoid(-all_actions[:, 0])
+            # old_inv_ln_probs -= torch.log(self.inventory_actions[1] - all_states[:, 0] + 1e-8)
             
             old_price_ln_probs = price_dist.log_prob(all_actions[:, 1]).diagonal()
-            old_price_ln_probs -= F.logsigmoid(all_actions[:, 1])
-            old_price_ln_probs -= F.logsigmoid(all_actions[:, 1])
-            old_price_ln_probs -= torch.log(self.price_diff)
+            # old_price_ln_probs -= F.logsigmoid(all_actions[:, 1])
+            # old_price_ln_probs -= F.logsigmoid(all_actions[:, 1])
+            # old_price_ln_probs -= torch.log(self.price_diff)
 
         index_list = [i for i in range(len(self.memory))]
 
@@ -891,14 +887,14 @@ class PPO_C:
             inv_dist = torch.distributions.Normal(inv_mu, inv_sigma)
             price_dist = torch.distributions.Normal(prc_mu, prc_sigma)
             inv_ln_probs = inv_dist.log_prob(actions[:, 0]).diagonal()
-            inv_ln_probs -= F.logsigmoid(actions[:, 0])
-            inv_ln_probs -= F.logsigmoid(-actions[:, 0])
-            inv_ln_probs -= torch.log(self.inventory_actions[1] - states[:, 0] + 1e-8)
+            # inv_ln_probs -= F.logsigmoid(actions[:, 0])
+            # inv_ln_probs -= F.logsigmoid(-actions[:, 0])
+            # inv_ln_probs -= torch.log(self.inventory_actions[1] - states[:, 0] + 1e-8)
 
             price_ln_probs = price_dist.log_prob(actions[:, 1]).diagonal()
-            price_ln_probs -= F.logsigmoid(actions[:, 1])
-            price_ln_probs -= F.logsigmoid(-actions[:, 1])
-            price_ln_probs -= torch.log(self.price_diff)
+            # price_ln_probs -= F.logsigmoid(actions[:, 1])
+            # price_ln_probs -= F.logsigmoid(-actions[:, 1])
+            # price_ln_probs -= torch.log(self.price_diff)
 
             # print(inv_ln_probs, old_inv_ln_probs[batch])
             ratio = inv_ln_probs + price_ln_probs - old_inv_ln_probs[batch] - old_price_ln_probs[batch]

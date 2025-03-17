@@ -80,8 +80,8 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 200000, # 100000, 200000
-    "ENV": 20,
+    "T": 100000, # 100000, 200000
+    "ENV": 1,
     "n": 2,
     "m": 5,
     "delta": 0.95, # 0.95, 0.99
@@ -98,8 +98,8 @@ e1 = {
     "SAVE": False,
     "SUMMARY": True,
     "SHOW_PROM_RES": True,
-    "SAVE_SUMMARY": True,
-    "RANDOM_SEED": 42,
+    "SAVE_SUMMARY": False,
+    "RANDOM_SEED": 30,
 }
 
 # Это чтобы я случайно не потерял все результаты симуляций
