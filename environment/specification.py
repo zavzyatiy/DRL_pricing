@@ -80,15 +80,15 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 100000, # 100000, 200000
-    "ENV": 200,
+    "T": 200000, # 100000, 200000
+    "ENV": 100,
     "n": 2,
     "m": 5,
     "delta": 0.95, # 0.95, 0.99
     "gamma": 0.5,
     "c_i": 1, # 0.25, 1
-    "h_plus": 3, # 1.17498/2, # Из Zhou: примерно половина монопольной цены
-    "v_minus": 3, # 1.17498/4, # Из Zhou: примерно четверть монопольной цены
+    "h_plus": 3,        # Из Zhou: примерно половина монопольной цены
+    "v_minus": 3,       # Из Zhou: примерно четверть монопольной цены
     "eta": 0.05,
     "color": ["#FF7F00", "#1874CD", "#548B54", "#CD2626", "#CDCD00"],
     "profit_dynamic": "compare", # "MA", "real", "compare"
@@ -122,7 +122,7 @@ e3 = {
     },
 }
 
-mode = "D" # C, D
+mode = "C" # C, D
 
 if mode == "D":
     prices = np.linspace(e2["p_inf"], e2["p_sup"], e2["arms_amo_price"])
@@ -186,53 +186,53 @@ ONLY_OWN = False
 ##########################
 ### PPO-D
 ##########################
-assert mode == "D"
+# assert mode == "D"
+# e4 = {
+#     "prices": prices,
+#     "inventory": inventory,
+#     "firm_model": PPO_D,
+#     "firm_params": {
+#         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+#         "inventory_actions": inventory,
+#         "price_actions": prices,
+#         "batch_size": 100, # 32, 64, 100, 128
+#         "N_epochs": 100, # 100, e1["T"]//100
+#         "epochs": 25, # 25
+#         "gamma": e1["delta"],
+#         "actor_lr": 0.00005,
+#         "critic_lr": 0.00005,
+#         "clip_eps": 0.2,
+#         "lmbda": 1,
+#         "cuda_usage": True,
+#     },
+#     "MEMORY_VOLUME": MEMORY_VOLUME,
+#     "own": own,
+# }
+##########################
+### PPO-C
+##########################
+assert mode == "C"
 e4 = {
     "prices": prices,
     "inventory": inventory,
-    "firm_model": PPO_D,
+    "firm_model": PPO_C,
     "firm_params": {
         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
         "inventory_actions": inventory,
         "price_actions": prices,
         "batch_size": 100, # 32, 64, 100, 128
-        "N_epochs": 100, # 100, e1["T"]//100
+        "N_epochs": 100, # 100, 200, e1["T"]//100
         "epochs": 25, # 25
         "gamma": e1["delta"],
         "actor_lr": 0.00005,
         "critic_lr": 0.00005,
         "clip_eps": 0.2,
         "lmbda": 1,
-        "cuda_usage": True,
+        "cuda_usage": False,
     },
     "MEMORY_VOLUME": MEMORY_VOLUME,
     "own": own,
 }
-##########################
-### PPO-C
-##########################
-# assert mode == "C"
-# e4 = {
-#     "prices": prices,
-#     "inventory": inventory,
-#     "firm_model": PPO_C,
-#     "firm_params": {
-#         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
-#         "inventory_actions": inventory,
-#         "price_actions": prices,
-#         "batch_size": 100, # 32, 64, 100, 128
-#         "N_epochs": 100, # 100, 200, e1["T"]//100
-#         "epochs": 25, # 25
-#         "gamma": e1["delta"],
-#         "actor_lr": 0.000001,
-#         "critic_lr": 0.000001,
-#         "clip_eps": 0.2,
-#         "lmbda": 1,
-#         "cuda_usage": False,
-#     },
-#     "MEMORY_VOLUME": MEMORY_VOLUME,
-#     "own": own,
-# }
 ##########################
 ### SAC
 ##########################

@@ -704,7 +704,11 @@ class PPO_C_ActorNet(nn.Module):
         prc_mu, prc_sigma = self.price_head_mu(y), self.price_head_sigma(y)
         assert not torch.isnan(inv_mu).any(), "inv_mu is NaN"
         assert not torch.isnan(prc_mu).any(), "prc_mu is NaN"
-        inv_sigma, prc_sigma = F.softplus(inv_sigma), F.softplus(prc_sigma)
+        # inv_sigma, prc_sigma = torch.exp(log_inv_sigma).clip(0.1, 5), torch.exp(log_prc_sigma).clip(0.1, 5)
+        inv_sigma = torch.pow(1 + torch.pow(inv_sigma, 2), 0.5) - 1
+        inv_sigma = inv_sigma.clamp(min = 0.01)
+        prc_sigma = torch.pow(1 + torch.pow(prc_sigma, 2), 0.5) - 1
+        prc_sigma = prc_sigma.clamp(min = 0.01)
         return (inv_mu, inv_sigma, prc_mu, prc_sigma)
 
 
