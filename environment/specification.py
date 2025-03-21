@@ -81,7 +81,7 @@ class demand_function:
 
 e1 = {
     "T": 200000, # 100000, 200000
-    "ENV": 100,
+    "ENV": 50,
     "n": 2,
     "m": 5,
     "delta": 0.95, # 0.95, 0.99
@@ -99,7 +99,7 @@ e1 = {
     "SUMMARY": True,
     "SHOW_PROM_RES": True,
     "SAVE_SUMMARY": True,
-    "RANDOM_SEED": 42,
+    "RANDOM_SEED": 65,
 }
 
 # Это чтобы я случайно не потерял все результаты симуляций
