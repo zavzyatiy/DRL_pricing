@@ -24,7 +24,7 @@
     "SUMMARY": true,
     "SHOW_PROM_RES": true,
     "SAVE_SUMMARY": true,
-    "RANDOM_SEED": 65, ### ИСПОЛЬЗОВАЛСЯ ДЛЯ ЧАСТИ НАБЛЮДЕНИЙ!!!
+    "RANDOM_SEED": 65,
     "p_inf": 1,
     "p_sup": 2.5,
     "arms_amo_price": 101,

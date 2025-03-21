@@ -99,7 +99,7 @@ e1 = {
     "SUMMARY": True,
     "SHOW_PROM_RES": True,
     "SAVE_SUMMARY": True,
-    "RANDOM_SEED": 65,
+    "RANDOM_SEED": 23,
 }
 
 # Это чтобы я случайно не потерял все результаты симуляций
@@ -262,3 +262,72 @@ Environment = e1 | e2 | e3 | e4 | e5
 #     )
 
 # print(Environment)
+
+# Price_history = []
+# Profit_history = []
+# Stock_history = []
+
+# for i in range(1, 2 + 1):
+#     folder_name = f"./DRL_pricing/environment/simulation_results/PPO_C_{i}/"
+#     a1, a2, a3 = np.load(folder_name + "Price_history.npy"), np.load(folder_name + "Profit_history.npy"), np.load(folder_name + "Stock_history.npy")
+#     Price_history = Price_history + a1.tolist()
+#     Profit_history = Profit_history + a2.tolist()
+#     Stock_history = Stock_history + a3.tolist()
+
+# Price_history = np.array(Price_history)
+# Profit_history = np.array(Profit_history)
+# Stock_history = np.array(Stock_history)
+
+# # np.save("./DRL_pricing/environment/simulation_results/PPO_C_0/Price_history.npy", Price_history)
+# # np.save("./DRL_pricing/environment/simulation_results/PPO_C_0/Profit_history.npy", Profit_history)
+# # np.save("./DRL_pricing/environment/simulation_results/PPO_C_0/Stock_history.npy", Stock_history)
+
+# n = 2
+# res_name = "./DRL_pricing/environment/simulation_results/PPO_C_0/"
+# T = 200000
+# HAS_INV = 1
+# c_i = 1
+
+# VISUALIZE_THEORY = 1
+
+# demand_params = Environment["demand_params"]
+# spros = demand_function(**demand_params)
+# if VISUALIZE_THEORY:
+#     p_NE, p_M, pi_NE, pi_M = spros.get_theory(c_i)
+#     inv_NE, inv_M = spros.distribution([p_NE]*n)[0], spros.distribution([p_M]*n)[0]
+
+# with open(res_name + "summary.txt", "w+", encoding="utf-8") as f:
+#     A = ""
+#     A = A + f"Средняя цена по последним {int(T/20)} раундов: " + " ".join([str(round(np.mean(Price_history[:, i]), 3)) for i in range(n)])
+#     A = A + "\n"
+#     if HAS_INV == 1:
+#         A = A + f"Среднии запасы по последним {int(T/20)} раундов: " + " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)])
+#         A = A + "\n"
+
+#     A = A + f"Средняя прибыль по последним {int(T/20)} раундов: " + " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)])
+#     A = A + "\n"
+
+#     A = A + "-"*20*n
+#     A = A + "\n"
+#     A = A + "Теоретические цены: " + f"{round(p_NE , 3)}, {round(p_M , 3)}"
+#     A = A + "\n"
+
+#     if HAS_INV == 1:
+#         A = A + "Теоретические инв. в запасы: " + f"{round(inv_NE , 3)}, {round(inv_M , 3)}"
+#         A = A + "\n"
+
+#     A = A + "Теоретические прибыли: " + f"{round(pi_NE , 3)}, {round(pi_M , 3)}"
+#     A = A + "\n"
+
+#     A = A + "-"*20*n
+#     A = A + "\n"
+#     A = A + "Индекс сговора по цене: " + str(round(100 * (np.mean(Price_history) - p_NE)/(p_M - p_NE), 2)) + "%"
+#     A = A + "\n"
+
+#     if HAS_INV == 1:
+#         A = A + "Индекс сговора по запасам: " + str(round(100 * (np.mean(Stock_history) - inv_NE)/(inv_M - inv_NE), 2)) + "%"
+#         A = A + "\n"
+
+#     A = A + "Индекс сговора по прибыли: " + str(round(100 * (np.mean(Profit_history) - pi_NE)/(pi_M - pi_NE), 2)) + "%"
+#     A = A + "\n"
+#     f.write(A)

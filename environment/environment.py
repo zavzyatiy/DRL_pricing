@@ -798,29 +798,30 @@ if SAVE_SUMMARY or VISUALIZE:
             A = A + f"Средняя прибыль по последним {int(T/20)} раундов: " + " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)])
             A = A + "\n"
 
-            A = A + "-"*20*n
-            A = A + "\n"
-            A = A + "Теоретические цены: " + f"{round(p_NE , 3)}, {round(p_M , 3)}"
-            A = A + "\n"
-
-            if HAS_INV == 1:
-                A = A + "Теоретические инв. в запасы: " + f"{round(inv_NE , 3)}, {round(inv_M , 3)}"
+            if VISUALIZE_THEORY:
+                A = A + "-"*20*n
+                A = A + "\n"
+                A = A + "Теоретические цены: " + f"{round(p_NE , 3)}, {round(p_M , 3)}"
                 A = A + "\n"
 
-            A = A + "Теоретические прибыли: " + f"{round(pi_NE , 3)}, {round(pi_M , 3)}"
-            A = A + "\n"
+                if HAS_INV == 1:
+                    A = A + "Теоретические инв. в запасы: " + f"{round(inv_NE , 3)}, {round(inv_M , 3)}"
+                    A = A + "\n"
 
-            A = A + "-"*20*n
-            A = A + "\n"
-            A = A + "Индекс сговора по цене: " + str(round(100 * (np.mean(Price_history) - p_NE)/(p_M - p_NE), 2)) + "%"
-            A = A + "\n"
-
-            if HAS_INV == 1:
-                A = A + "Индекс сговора по запасам: " + str(round(100 * (np.mean(Stock_history) - inv_NE)/(inv_M - inv_NE), 2)) + "%"
+                A = A + "Теоретические прибыли: " + f"{round(pi_NE , 3)}, {round(pi_M , 3)}"
                 A = A + "\n"
 
-            A = A + "Индекс сговора по прибыли: " + str(round(100 * (np.mean(Profit_history) - pi_NE)/(pi_M - pi_NE), 2)) + "%"
-            A = A + "\n"
+                A = A + "-"*20*n
+                A = A + "\n"
+                A = A + "Индекс сговора по цене: " + str(round(100 * (np.mean(Price_history) - p_NE)/(p_M - p_NE), 2)) + "%"
+                A = A + "\n"
+
+                if HAS_INV == 1:
+                    A = A + "Индекс сговора по запасам: " + str(round(100 * (np.mean(Stock_history) - inv_NE)/(inv_M - inv_NE), 2)) + "%"
+                    A = A + "\n"
+
+                A = A + "Индекс сговора по прибыли: " + str(round(100 * (np.mean(Profit_history) - pi_NE)/(pi_M - pi_NE), 2)) + "%"
+                A = A + "\n"
             f.write(A)
 
         if VISUALIZE and SAVE_SUMMARY:
