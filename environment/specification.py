@@ -267,7 +267,7 @@ Environment = e1 | e2 | e3 | e4 | e5
 # Profit_history = []
 # Stock_history = []
 
-# for i in range(1, 2 + 1):
+# for i in range(1, 4 + 1):
 #     folder_name = f"./DRL_pricing/environment/simulation_results/PPO_C_{i}/"
 #     a1, a2, a3 = np.load(folder_name + "Price_history.npy"), np.load(folder_name + "Profit_history.npy"), np.load(folder_name + "Stock_history.npy")
 #     Price_history = Price_history + a1.tolist()
@@ -278,9 +278,11 @@ Environment = e1 | e2 | e3 | e4 | e5
 # Profit_history = np.array(Profit_history)
 # Stock_history = np.array(Stock_history)
 
-# # np.save("./DRL_pricing/environment/simulation_results/PPO_C_0/Price_history.npy", Price_history)
-# # np.save("./DRL_pricing/environment/simulation_results/PPO_C_0/Profit_history.npy", Profit_history)
-# # np.save("./DRL_pricing/environment/simulation_results/PPO_C_0/Stock_history.npy", Stock_history)
+# np.save("./DRL_pricing/environment/simulation_results/PPO_C_0/Price_history.npy", Price_history)
+# np.save("./DRL_pricing/environment/simulation_results/PPO_C_0/Profit_history.npy", Profit_history)
+# np.save("./DRL_pricing/environment/simulation_results/PPO_C_0/Stock_history.npy", Stock_history)
+
+# print(Profit_history)
 
 # n = 2
 # res_name = "./DRL_pricing/environment/simulation_results/PPO_C_0/"
