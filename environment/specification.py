@@ -99,7 +99,7 @@ e1 = {
     "SUMMARY": True,
     "SHOW_PROM_RES": True,
     "SAVE_SUMMARY": True,
-    "RANDOM_SEED": 23,
+    "RANDOM_SEED": 34,
 }
 
 # Это чтобы я случайно не потерял все результаты симуляций
