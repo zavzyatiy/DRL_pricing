@@ -80,7 +80,7 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 200000, # 100000, 200000
+    "T": 400000, # 100000, 200000
     "ENV": 10,
     "n": 2,
     "m": 5,
@@ -99,7 +99,7 @@ e1 = {
     "SUMMARY": True,
     "SHOW_PROM_RES": True,
     "SAVE_SUMMARY": True,
-    "RANDOM_SEED": 23,
+    "RANDOM_SEED": 42,
 }
 
 # Это чтобы я случайно не потерял все результаты симуляций
@@ -248,13 +248,13 @@ e4 = {
         "batch_size": 100,         # 32, 64, 100, 128
         "N_epochs": 100,           # 100, 200, e1["T"]//100
         "epochs": 1,
-        "MC_samples": 2,
+        "MC_samples": 10,
         "gamma": e1["delta"],
         "actor_lr": 3e-4,
         "critic_lr": 3e-4,
         "target_lr": 3e-4,
         "alpha_lr": 3e-4,
-        "arget_entropy": -10,
+        "arget_entropy": -100,
         "tau": 0.005,
         "cuda_usage": False,
     },
