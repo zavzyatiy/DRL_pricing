@@ -1055,8 +1055,8 @@ class SAC:
 
         self.tau = tau
         self.MC_samples = MC_samples
-        self.inf_logsigma = torch.log(torch.tensor(1e-4))
-        self.sup_logsigma = torch.log(torch.tensor(1 - 1e-4))
+        self.inf_logsigma = torch.log(torch.tensor(1e-4)).to(self.device)
+        self.sup_logsigma = torch.log(torch.tensor(1 - 1e-4)).to(self.device)
         
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=actor_lr)
         self.critic_1_optimizer = torch.optim.Adam(self.critic_1.parameters(), lr=critic_lr)

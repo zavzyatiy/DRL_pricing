@@ -559,14 +559,10 @@ for env in range(ENV):
                     max_t = min(total_t + N_epochs, T)
                 
                 for t in range(min_t, max_t):
-
-                    # print("!!!", t)
-
                     acts = []
                     iter_probs = []
-                    # print("ЗАПАСЫ", x_t)
+                    
                     for i in range(n):
-                        # print("Фирма:", i)
                         state_i = mem.copy()
 
                         if len(state_i) == MEMORY_VOLUME and not(own):
@@ -587,8 +583,7 @@ for env in range(ENV):
                             act_inv = x_t[i] + torch.sigmoid(u_inv/10) * (inventory[1] - x_t[i])
                             act_price = prices[0] + torch.sigmoid(u_prc/10) * (prices[1] - prices[0])
                             acts_i = (act_inv, act_price)
-                        # print("Фирма", i)
-                        # print("iter_probs", (u_inv, u_prc))
+                        
                         iter_probs.append((u_inv, u_prc))
                         acts.append(acts_i)
 
@@ -601,13 +596,10 @@ for env in range(ENV):
                     
                     inv = np.array([x[0] for x in acts])
                     p = np.array([x[1] for x in acts])
-                    # print(p)
-
                     doli = spros.distribution(p)
 
                     pi = p * doli - c_i * (inv - np.array(x_t)) - h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
-                    # print("-"*50)
-                    # print("Итерация", t, total_t)
+
                     if len(learn) == MEMORY_VOLUME:
                         for i in range(n):
                             state_i = mem.copy()
@@ -631,10 +623,7 @@ for env in range(ENV):
                             }
                             
                             firms[i].cache_experience(prev_state, iter_probs[i], pi[i], new_state)
-                            # print(f"Память фирмы {i}", firms[i].memory)
-                            
-                    # for i in range(n):
-                    #     x_t[i] = max(0, inv[i] - doli[i])
+                    
                     x_t = np.maximum(0, inv - doli)
                     
                     mem = learn.copy()
@@ -647,9 +636,7 @@ for env in range(ENV):
                 if total_t < 0:
                     total_t = 0
                 else:
-                    # print("#"*50)
                     for i in range(n):
-                        # print("Обновление фирмы", i)
                         firms[i].update()
                     
                     total_t = min(total_t + N_epochs, T)
