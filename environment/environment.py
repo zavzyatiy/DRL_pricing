@@ -113,6 +113,13 @@ elif str(M(**firm_params)) == "PPO_C":
     N_epochs = Environment["firm_params"]["N_epochs"]
     epochs = Environment["firm_params"]["epochs"]
     assert (N_epochs >= batch_size) # and (N_epochs >= epochs)
+elif str(M(**firm_params)) == "SAC":
+    MEMORY_VOLUME = Environment["MEMORY_VOLUME"]
+    own = Environment["own"]
+    batch_size = Environment["firm_params"]["batch_size"]
+    N_epochs = Environment["firm_params"]["N_epochs"]
+    epochs = Environment["firm_params"]["epochs"]
+    assert (N_epochs >= batch_size)
 
 Price_history = []
 Profit_history = []
@@ -541,8 +548,111 @@ for env in range(ENV):
                     total_t = min(total_t + N_epochs, T)
 
     elif str(firms[0]) == "SAC":
+        total_t = -MEMORY_VOLUME
+        with tqdm(total = T + MEMORY_VOLUME, desc=f'Раунд {env + 1}') as pbar:
+            while total_t < T:
+                if total_t < 0:
+                    min_t = total_t
+                    max_t = 0
+                else:
+                    min_t = total_t
+                    max_t = min(total_t + N_epochs, T)
+                
+                for t in range(min_t, max_t):
 
-        continue
+                    # print("!!!", t)
+
+                    acts = []
+                    iter_probs = []
+                    # print("ЗАПАСЫ", x_t)
+                    for i in range(n):
+                        # print("Фирма:", i)
+                        state_i = mem.copy()
+
+                        if len(state_i) == MEMORY_VOLUME and not(own):
+                            for j in range(MEMORY_VOLUME):
+                                state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
+                        
+                        firm_state = {
+                            'current_inventory': x_t[i],
+                            'competitors_prices': state_i,
+                        }
+
+                        if t >= 0:
+                            inv, price, u_inv, u_prc = firms[i].suggest_actions(firm_state)
+                            acts_i = (inv, price)
+                        else:
+                            u_inv = torch.distributions.Normal(0, 1).sample()
+                            u_prc = torch.distributions.Normal(0, 1).sample()
+                            act_inv = x_t[i] + torch.sigmoid(u_inv/10) * (inventory[1] - x_t[i])
+                            act_price = prices[0] + torch.sigmoid(u_prc/10) * (prices[1] - prices[0])
+                            acts_i = (act_inv, act_price)
+                        # print("Фирма", i)
+                        # print("iter_probs", (u_inv, u_prc))
+                        iter_probs.append((u_inv, u_prc))
+                        acts.append(acts_i)
+
+                    learn = mem.copy()
+
+                    if len(learn) < MEMORY_VOLUME:
+                        learn.append([x[1] for x in acts])
+                    else:
+                        learn = learn[1:] + [[x[1] for x in acts]]
+                    
+                    inv = np.array([x[0] for x in acts])
+                    p = np.array([x[1] for x in acts])
+                    # print(p)
+
+                    doli = spros.distribution(p)
+
+                    pi = p * doli - c_i * (inv - np.array(x_t)) - h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
+                    # print("-"*50)
+                    # print("Итерация", t, total_t)
+                    if len(learn) == MEMORY_VOLUME:
+                        for i in range(n):
+                            state_i = mem.copy()
+                            if len(state_i) == MEMORY_VOLUME and not(own):
+                                for j in range(MEMORY_VOLUME):
+                                    state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
+                            
+                            new = learn.copy()
+                            if len(new) == MEMORY_VOLUME and not(own):
+                                for j in range(MEMORY_VOLUME):
+                                    new[j] = new[j][: i] + new[j][i + 1 :]
+                            
+                            prev_state = {
+                                'current_inventory': x_t[i],
+                                'competitors_prices': state_i,
+                            }
+
+                            new_state = {
+                                'current_inventory': max(0, inv[i] - doli[i]),
+                                'competitors_prices': new,
+                            }
+                            
+                            firms[i].cache_experience(prev_state, iter_probs[i], pi[i], new_state)
+                            # print(f"Память фирмы {i}", firms[i].memory)
+                            
+                    # for i in range(n):
+                    #     x_t[i] = max(0, inv[i] - doli[i])
+                    x_t = np.maximum(0, inv - doli)
+                    
+                    mem = learn.copy()
+
+                    pbar.update(1)
+                    raw_profit_history.append(pi)
+                    raw_price_history.append(p)
+                    raw_stock_history.append(inv)
+                
+                if total_t < 0:
+                    total_t = 0
+                else:
+                    # print("#"*50)
+                    for i in range(n):
+                        # print("Обновление фирмы", i)
+                        firms[i].update()
+                    
+                    total_t = min(total_t + N_epochs, T)
 
     raw_price_history = np.array(raw_price_history)
     raw_profit_history = np.array(raw_profit_history)

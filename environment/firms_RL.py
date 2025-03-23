@@ -718,7 +718,7 @@ class PPO_C_CriticNet(nn.Module):
         
         sloy = 256 # 256
         
-        self.d_critic_net = nn.Sequential(
+        self.c_critic_net = nn.Sequential(
             nn.Linear(input_dim, sloy),
             nn.LayerNorm(sloy),
             nn.ReLU(),
@@ -730,7 +730,7 @@ class PPO_C_CriticNet(nn.Module):
 
 
     def forward(self, x):
-        return self.d_critic_net(x)
+        return self.c_critic_net(x)
 
 
 class PPO_C:
@@ -918,27 +918,151 @@ class PPO_C:
             # print("#"*40)
 
 
+class SAC_ActorNet(nn.Module):
+    def __init__(self, input_dim):
+        super().__init__()
+        
+        sloy = 256 # 256
+        
+        self.c_actor_net = nn.Sequential(
+            nn.Linear(input_dim, sloy),
+            nn.LayerNorm(sloy),
+            nn.ReLU(),
+            nn.Linear(sloy, sloy),
+            nn.LayerNorm(sloy),
+            nn.ReLU(),
+        )
+
+        self.inventory_head_mu = nn.Linear(sloy, 1)
+        self.inventory_head_sigma = nn.Linear(sloy, 1)
+        self.price_head_mu = nn.Linear(sloy, 1)
+        self.price_head_sigma = nn.Linear(sloy, 1)
+        
+
+    def forward(self, x):
+        y = self.c_actor_net(x)
+        inv_mu, inv_sigma = self.inventory_head_mu(y), self.inventory_head_sigma(y)
+        prc_mu, prc_sigma = self.price_head_mu(y), self.price_head_sigma(y)
+        assert not torch.isnan(inv_mu).any(), "inv_mu is NaN"
+        assert not torch.isnan(prc_mu).any(), "prc_mu is NaN"
+        # inv_sigma, prc_sigma = torch.exp(log_inv_sigma).clip(0.1, 5), torch.exp(log_prc_sigma).clip(0.1, 5)
+        inv_sigma = torch.pow(1 + torch.pow(inv_sigma, 2), 0.5) - 1
+        inv_sigma = inv_sigma.clamp(min = 0.01)
+        prc_sigma = torch.pow(1 + torch.pow(prc_sigma, 2), 0.5) - 1
+        prc_sigma = prc_sigma.clamp(min = 0.01)
+        return (inv_mu, inv_sigma, prc_mu, prc_sigma)
+
+
+class SAC_CriticNet_Q(nn.Module):
+    def __init__(self, input_dim, action_dim):
+        super().__init__()
+        
+        sloy = 256 # 256
+        
+        self.net = nn.Sequential(
+            nn.Linear(input_dim + action_dim, sloy),
+            nn.LayerNorm(sloy),
+            nn.ReLU(),
+            nn.Linear(sloy, sloy),
+            nn.LayerNorm(sloy),
+            nn.ReLU(),
+            nn.Linear(sloy, 1)
+            )
+
+
+    def forward(self, x):
+        return self.net(x)
+
+
+class SAC_CriticNet_Q_target(nn.Module):
+    def __init__(self, input_dim):
+        super().__init__()
+        
+        sloy = 256 # 256
+        
+        self.target = nn.Sequential(
+            nn.Linear(input_dim, sloy),
+            nn.LayerNorm(sloy),
+            nn.ReLU(),
+            nn.Linear(sloy, sloy),
+            nn.LayerNorm(sloy),
+            nn.ReLU(),
+            nn.Linear(sloy, 1)
+            )
+
+
+    def forward(self, x):
+        return self.target(x)
 
 
 class SAC:
     def __init__(
             self,
-            # state_dim: int,
-            # inventory_actions: list,
-            # price_actions: list,
-            # batch_size: int,
-            # N_epochs: int,
-            # gamma: float,
-            # actor_lr: float,
-            # critic_lr: float,
-            # epochs: int,
-            # clip_eps: float,
-            # lmbda: float,
-            # cuda_usage: bool,
-            # dtype = torch.float32,
+            state_dim: int,
+            inventory_actions: list,
+            price_actions: list,
+            batch_size: int,
+            N_epochs: int,
+            MC_samples: int,
+            gamma: float,
+            actor_lr: float,
+            critic_lr: float,
+            target_lr: float,
+            epochs: int,
+            alpha_lr: float,
+            arget_entropy: float,
+            tau: float,
+            cuda_usage: bool,
+            dtype = torch.float32,
             ):
         
-        pass
+        self.state_dim = state_dim
+        self.inventory_actions = inventory_actions
+        self.price_actions = price_actions
+        self.cuda_usage = cuda_usage
+
+        if cuda_usage:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = torch.device("cpu")
+
+        self.dtype = dtype
+        self.price_diff = torch.tensor(self.price_actions[1] - self.price_actions[0])
+
+        # Actor and Critic networks
+        self.actor = SAC_ActorNet(state_dim).to(self.device)            # Actor
+        self.critic_1 = SAC_CriticNet_Q(state_dim, 2).to(self.device)   # Q_1
+        self.critic_2 = SAC_CriticNet_Q(state_dim, 2).to(self.device)   # Q_2
+        self.target = SAC_CriticNet_Q_target(state_dim).to(self.device) # Q^{target}
+        self.frozen_target = deepcopy(self.target)                      # Q^{target}(\cdot ; \bar{\psi})
+
+        # Q_target parameters are frozen.
+        for p in self.frozen_target.parameters():
+            p.requires_grad = False
+        
+        # Hyperparameters
+        self.batch_size = batch_size
+        self.gamma = gamma
+        self.epochs = epochs
+        self.memory_size = N_epochs
+        self.memory = []
+        self.alpha_lr = alpha_lr
+        self.arget_entropy = arget_entropy
+        self.log_alpha = torch.tensor(np.log(0.01)).to(self.device)
+        self.log_alpha.requires_grad = True
+        # set target entropy to -|A|
+        self.target_entropy = -2
+
+        self.tau = tau
+        self.MC_samples = MC_samples
+        self.inf_logsigma = torch.log(torch.tensor(1e-4))
+        self.sup_logsigma = torch.log(torch.tensor(1 - 1e-4))
+        
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=actor_lr)
+        self.critic_1_optimizer = torch.optim.Adam(self.critic_1.parameters(), lr=critic_lr)
+        self.critic_2_optimizer = torch.optim.Adam(self.critic_2.parameters(), lr=critic_lr)
+        self.target_optimizer = torch.optim.Adam(self.target.parameters(), lr=target_lr)
+        self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=alpha_lr)
 
 
     def __repr__(self):
@@ -961,7 +1085,7 @@ class SAC:
         """Возвращает действия (инвентарь, цену)"""
         state = self._get_state_vector(firm_state)
         
-        inv_mu, inv_sigma, prc_mu, prc_sigma = self.c_actor_net(state)
+        inv_mu, inv_sigma, prc_mu, prc_sigma = self.actor(state)
         
         u_inv = torch.distributions.Normal(inv_mu, inv_sigma).sample()
         u_prc = torch.distributions.Normal(prc_mu, prc_sigma).sample()
@@ -996,6 +1120,55 @@ class SAC:
                 ))
 
 
+    def calc_target_for_target(self, states):
+        inv_mu, inv_sigma, prc_mu, prc_sigma = self.actor(states)
+        inv_dist = torch.distributions.Normal(inv_mu.detach(), inv_sigma.detach())
+        price_dist = torch.distributions.Normal(prc_mu.detach(), prc_sigma.detach())
+        u_inv = inv_dist.sample(sample_shape=(self.MC_samples,)).squeeze().T
+        u_prc = price_dist.sample(sample_shape=(self.MC_samples,)).squeeze().T
+
+        inv = states[:, 0].unsqueeze(1) + torch.sigmoid(u_inv/10).clamp(1e-4, 1-1e-4) * (self.inventory_actions[1] - states[:, 0].unsqueeze(1))
+        price = self.price_actions[0] + torch.sigmoid(u_prc/10).clamp(1e-4, 1-1e-4) * self.price_diff
+
+        target_input = torch.cat(
+            [
+                inv.unsqueeze(2),                                          # (len(self.memory), MC_samples, 1)
+                price.unsqueeze(2),                                        # (len(self.memory), MC_samples, 1)
+                states.unsqueeze(1).expand(-1, self.MC_samples, -1)        # (len(self.memory), MC_samples, 2)
+            ],
+            dim=2
+        )
+
+        Q_tensor = torch.minimum(self.critic_1(target_input).detach().squeeze(), self.critic_2(target_input).detach().squeeze())
+        E_Q_tensor = torch.mean(Q_tensor, axis = 1).view(-1, 1)
+        inv_log_prob = inv_dist.log_prob(u_inv.T.unsqueeze(-1)).squeeze(-1).T
+        inv_log_prob -= F.logsigmoid(u_inv).clamp(self.inf_logsigma, self.sup_logsigma)
+        inv_log_prob -= F.logsigmoid(-u_inv).clamp(self.inf_logsigma, self.sup_logsigma)
+        inv_log_prob -= torch.log(self.inventory_actions[1] - states[:, 0].unsqueeze(1) + 1e-8) - torch.log(torch.tensor(10))
+        E_inv_log_prob = torch.mean(inv_log_prob, axis = 1).view(-1, 1)
+        prc_log_prob = price_dist.log_prob(u_prc.T.unsqueeze(-1)).squeeze(-1).T
+        prc_log_prob -= F.logsigmoid(u_prc).clamp(self.inf_logsigma, self.sup_logsigma)
+        prc_log_prob -= F.logsigmoid(-u_prc).clamp(self.inf_logsigma, self.sup_logsigma)
+        prc_log_prob -= torch.log(self.price_diff) - torch.log(torch.tensor(10))
+        E_prc_log_prob = torch.mean(prc_log_prob, axis = 1).view(-1, 1)
+
+        target_target = E_Q_tensor - self.log_alpha.exp().detach() * (E_inv_log_prob + E_prc_log_prob)
+        return target_target
+
+
+    def calc_target(self, rewards, next_states):
+        V = self.frozen_target(next_states)
+        target = rewards + self.gamma * V.detach()
+        return target
+
+
+    def soft_update(self, net, frozen_net):
+        for param_frozen, param in zip(frozen_net.parameters(),
+                                       net.parameters()):
+            param_frozen.data.copy_(param_frozen.data * (1.0 - self.tau) + param.data * self.tau)
+            param_frozen.requires_grad = False
+
+
     def update(self):
         """Обновление модели на основе данных в памяти"""
         if len(self.memory) < self.batch_size:
@@ -1012,29 +1185,8 @@ class SAC:
             all_rewards = torch.stack([x[2] for x in self.memory], dim = 1)[0].view(-1, 1).to(self.device)
             all_next_states = torch.stack([x[3] for x in self.memory]).to(self.device)
         
-        td_target = all_rewards + self.gamma * self.c_critic_net(all_next_states)
-        td_delta = td_target - self.c_critic_net(all_states)
-        advantage = compute_advantage(self.gamma, self.lmbda, td_delta.cpu()).to(self.device)
-        # print("all_rewards", all_rewards)
-        # print(td_delta)
-
-        with torch.no_grad():
-            inv_mu, inv_sigma, prc_mu, prc_sigma = self.c_actor_net(all_states)
-            inv_dist = torch.distributions.Normal(inv_mu.detach(), inv_sigma.detach())
-            price_dist = torch.distributions.Normal(prc_mu.detach(), prc_sigma.detach())
-
-            # print("all_actions", all_actions)
-            # print("all_actions[:, 0]", all_actions[:, 0])
-
-            old_inv_ln_probs = inv_dist.log_prob(all_actions[:, 0]).diagonal()
-            # old_inv_ln_probs -= F.logsigmoid(all_actions[:, 0])
-            # old_inv_ln_probs -= F.logsigmoid(-all_actions[:, 0])
-            # old_inv_ln_probs -= torch.log(self.inventory_actions[1] - all_states[:, 0] + 1e-8)
-            
-            old_price_ln_probs = price_dist.log_prob(all_actions[:, 1]).diagonal()
-            # old_price_ln_probs -= F.logsigmoid(all_actions[:, 1])
-            # old_price_ln_probs -= F.logsigmoid(all_actions[:, 1])
-            # old_price_ln_probs -= torch.log(self.price_diff)
+        # print(all_next_states)
+        # a += all_next_states
 
         index_list = [i for i in range(len(self.memory))]
 
@@ -1042,38 +1194,65 @@ class SAC:
             # print("Итерация обновления", _)
             batch = random.sample(index_list, self.batch_size)
             states = all_states[batch]
+            next_states = all_next_states[batch]
             actions = all_actions[batch]
-            local_advantage = advantage[batch]
+            rewards = all_rewards[batch]
+
+            inv_mu, inv_sigma, prc_mu, prc_sigma = self.actor(states)
             
-            inv_mu, inv_sigma, prc_mu, prc_sigma = self.c_actor_net(states)
-            # print(states[-1])
-            # print(inv_sigma)
             inv_dist = torch.distributions.Normal(inv_mu, inv_sigma)
             price_dist = torch.distributions.Normal(prc_mu, prc_sigma)
+
+            inv = states[:, 0] + torch.sigmoid(actions[:, 0]/10).clamp(1e-4, 1-1e-4) * (self.inventory_actions[1] - states[:, 0])
+            price = self.price_actions[0] + torch.sigmoid(actions[:, 1]/10).clamp(1e-4, 1-1e-4) * self.price_diff
+            inv = inv.view(-1, 1)
+            price = price.view(-1, 1)
+
             inv_ln_probs = inv_dist.log_prob(actions[:, 0]).diagonal()
-            # inv_ln_probs -= F.logsigmoid(actions[:, 0])
-            # inv_ln_probs -= F.logsigmoid(-actions[:, 0])
-            # inv_ln_probs -= torch.log(self.inventory_actions[1] - states[:, 0] + 1e-8)
-
             price_ln_probs = price_dist.log_prob(actions[:, 1]).diagonal()
-            # price_ln_probs -= F.logsigmoid(actions[:, 1])
-            # price_ln_probs -= F.logsigmoid(-actions[:, 1])
-            # price_ln_probs -= torch.log(self.price_diff)
 
-            # print(inv_ln_probs, old_inv_ln_probs[batch])
-            ratio = inv_ln_probs + price_ln_probs - old_inv_ln_probs[batch] - old_price_ln_probs[batch]
-            ratio = torch.exp(ratio)
-            surr1 = ratio * local_advantage
-            surr2 = torch.clamp(ratio, 1 - self.clip_eps, 1 + self.clip_eps) * local_advantage
+            inv_ln_probs -= F.logsigmoid(actions[:, 0]).clamp(self.inf_logsigma, self.sup_logsigma)
+            inv_ln_probs -= F.logsigmoid(-actions[:, 0]).clamp(self.inf_logsigma, self.sup_logsigma)
+            inv_ln_probs -= torch.log(self.inventory_actions[1] - states[:, 0] + 1e-8) - torch.log(torch.tensor(10))
             
-            actor_loss = -torch.mean(torch.min(surr1, surr2))
-            critic_loss = F.mse_loss(self.c_critic_net(states), td_target[batch].detach())
+            price_ln_probs -= F.logsigmoid(actions[:, 1]).clamp(self.inf_logsigma, self.sup_logsigma)
+            price_ln_probs -= F.logsigmoid(-actions[:, 1]).clamp(self.inf_logsigma, self.sup_logsigma)
+            price_ln_probs -= torch.log(self.price_diff) - torch.log(torch.tensor(10))
+
+            # Update Q^{target}
+            td_target = self.calc_target_for_target(states)
+            target_loss = F.mse_loss(self.target(states), td_target.detach())
+
+            self.target_optimizer.zero_grad()
+            target_loss.backward()
+            self.target_optimizer.step()
+
+            # Update both Q-networks
+            td_target = self.calc_target(rewards, next_states)
+            critic_1_loss = F.mse_loss(self.critic_1(torch.cat([inv, price, states], dim = 1)), td_target.detach())
+            critic_2_loss = F.mse_loss(self.critic_2(torch.cat([inv, price, states], dim = 1)), td_target.detach())
+
+            self.critic_1_optimizer.zero_grad()
+            critic_1_loss.backward()
+            self.critic_1_optimizer.step()
+            self.critic_2_optimizer.zero_grad()
+            critic_2_loss.backward()
+            self.critic_2_optimizer.step()
+
+            # Update policy network
+            q1_value = self.critic_1(torch.cat([inv, price, states], dim = 1))
+            q2_value = self.critic_2(torch.cat([inv, price, states], dim = 1))
+            actor_loss = torch.mean(self.log_alpha.detach().exp() * (inv_ln_probs + price_ln_probs) - torch.min(q1_value, q2_value))
 
             self.actor_optimizer.zero_grad()
-            self.critic_optimizer.zero_grad()
             actor_loss.backward()
-            critic_loss.backward()
             self.actor_optimizer.step()
-            self.critic_optimizer.step()
-            # print("#"*40)
 
+            # Update alpha value
+            alpha_loss = torch.mean((inv_ln_probs + price_ln_probs - self.target_entropy).detach() * self.log_alpha.exp())
+            self.log_alpha_optimizer.zero_grad()
+            alpha_loss.backward()
+            self.log_alpha_optimizer.step()
+
+            # Update Q^{target}(\cdot ; \bar{\psi})
+            self.soft_update(self.target, self.frozen_target)

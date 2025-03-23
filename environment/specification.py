@@ -11,7 +11,7 @@ from tqdm import tqdm
 import os
 import json
 
-from firms_RL import epsilon_greedy, TQL, TN_DDQN, PPO_D, PPO_C
+from firms_RL import epsilon_greedy, TQL, TN_DDQN, PPO_D, PPO_C, SAC
 
 ### Всевозможные модели спросов
 class demand_function:
@@ -81,7 +81,7 @@ class demand_function:
 
 e1 = {
     "T": 200000, # 100000, 200000
-    "ENV": 50,
+    "ENV": 1,
     "n": 2,
     "m": 5,
     "delta": 0.95, # 0.95, 0.99
@@ -95,11 +95,11 @@ e1 = {
     "loc": "lower left",
     "VISUALIZE_THEORY": True,
     "VISUALIZE": True,
-    "SAVE": True,
+    "SAVE": False,
     "SUMMARY": True,
     "SHOW_PROM_RES": True,
-    "SAVE_SUMMARY": True,
-    "RANDOM_SEED": 34,
+    "SAVE_SUMMARY": False,
+    "RANDOM_SEED": 42,
 }
 
 # Это чтобы я случайно не потерял все результаты симуляций
@@ -211,55 +211,82 @@ ONLY_OWN = False
 ##########################
 ### PPO-C
 ##########################
+# assert mode == "C"
+# e4 = {
+#     "prices": prices,
+#     "inventory": inventory,
+#     "firm_model": PPO_C,
+#     "firm_params": {
+#         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+#         "inventory_actions": inventory,
+#         "price_actions": prices,
+#         "batch_size": 100, # 32, 64, 100, 128
+#         "N_epochs": 100, # 100, 200, e1["T"]//100
+#         "epochs": 25, # 25
+#         "gamma": e1["delta"],
+#         "actor_lr": 0.00005,
+#         "critic_lr": 0.00005,
+#         "clip_eps": 0.2,
+#         "lmbda": 1,
+#         "cuda_usage": False,
+#     },
+#     "MEMORY_VOLUME": MEMORY_VOLUME,
+#     "own": own,
+# }
+##########################
+### SAC
+##########################
 assert mode == "C"
 e4 = {
     "prices": prices,
     "inventory": inventory,
-    "firm_model": PPO_C,
+    "firm_model": SAC,
     "firm_params": {
         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
         "inventory_actions": inventory,
         "price_actions": prices,
-        "batch_size": 100, # 32, 64, 100, 128
-        "N_epochs": 100, # 100, 200, e1["T"]//100
-        "epochs": 25, # 25
+        "batch_size": 100,         # 32, 64, 100, 128
+        "N_epochs": 100,           # 100, 200, e1["T"]//100
+        "epochs": 3,              # 25
+        "MC_samples": 100,
         "gamma": e1["delta"],
         "actor_lr": 0.00005,
         "critic_lr": 0.00005,
-        "clip_eps": 0.2,
-        "lmbda": 1,
+        "target_lr": 0.00005,
+        "alpha_lr": 0.00005,
+        "arget_entropy": -2,
+        "tau": 0.5,
         "cuda_usage": False,
     },
     "MEMORY_VOLUME": MEMORY_VOLUME,
     "own": own,
 }
 ##########################
-### SAC
+### No platform
 ##########################
-
 e5 = {
 
 }
+##########################
+### Fixed weights platform
+##########################
+# e5 = {
+
+# }
+##########################
+### PPO-C platform
+##########################
+# e5 = {
+
+# }
+##########################
+### SAC platform
+##########################
+# e5 = {
+
+# }
 
 Environment = e1 | e2 | e3 | e4 | e5
-
-### Архив возможных параметризаций алгоритмов для фирм:
-
-# mode = None # None, "sanchez_cartas", "zhou"
-
-# firm1 = epsilon_greedy(
-#     eps,
-#     np.zeros(len(prices)),
-#     prices,
-#     mode = mode,
-#     )
-
-# firm2 = epsilon_greedy(
-#     eps,
-#     np.zeros(len(prices)),
-#     prices,
-#     mode = mode,
-#     )
 
 # print(Environment)
 
