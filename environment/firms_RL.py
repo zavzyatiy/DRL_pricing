@@ -928,9 +928,9 @@ class SAC_ActorNet(nn.Module):
             nn.Linear(input_dim, sloy),
             nn.LayerNorm(sloy),
             nn.ReLU(),
-            nn.Linear(sloy, sloy),
-            nn.LayerNorm(sloy),
-            nn.ReLU(),
+            # nn.Linear(sloy, sloy),
+            # nn.LayerNorm(sloy),
+            # nn.ReLU(),
         )
 
         self.inventory_head_mu = nn.Linear(sloy, 1)
@@ -963,9 +963,9 @@ class SAC_CriticNet_Q(nn.Module):
             nn.Linear(input_dim + action_dim, sloy),
             nn.LayerNorm(sloy),
             nn.ReLU(),
-            nn.Linear(sloy, sloy),
-            nn.LayerNorm(sloy),
-            nn.ReLU(),
+            # nn.Linear(sloy, sloy),
+            # nn.LayerNorm(sloy),
+            # nn.ReLU(),
             nn.Linear(sloy, 1)
             )
 
@@ -983,9 +983,9 @@ class SAC_CriticNet_Q_target(nn.Module):
         self.target = nn.Sequential(
             nn.Linear(input_dim, sloy),
             nn.LayerNorm(sloy),
-            nn.ReLU(),
-            nn.Linear(sloy, sloy),
-            nn.LayerNorm(sloy),
+            # nn.ReLU(),
+            # nn.Linear(sloy, sloy),
+            # nn.LayerNorm(sloy),
             nn.ReLU(),
             nn.Linear(sloy, 1)
             )
@@ -1010,7 +1010,7 @@ class SAC:
             target_lr: float,
             epochs: int,
             alpha_lr: float,
-            arget_entropy: float,
+            target_entropy: float,
             tau: float,
             cuda_usage: bool,
             dtype = torch.float32,
@@ -1047,11 +1047,10 @@ class SAC:
         self.memory_size = N_epochs
         self.memory = []
         self.alpha_lr = alpha_lr
-        self.arget_entropy = arget_entropy
-        self.log_alpha = torch.tensor(np.log(0.01)).to(self.device)
+        self.log_alpha = torch.tensor(0.0).to(self.device)
         self.log_alpha.requires_grad = True
         # set target entropy to -|A|
-        self.target_entropy = -2
+        self.target_entropy = target_entropy
 
         self.tau = tau
         self.MC_samples = MC_samples
@@ -1142,16 +1141,16 @@ class SAC:
         Q_tensor = torch.minimum(self.critic_1(target_input).detach().squeeze(), self.critic_2(target_input).detach().squeeze())
         E_Q_tensor = torch.mean(Q_tensor, axis = 1).view(-1, 1)
         inv_log_prob = inv_dist.log_prob(u_inv.T.unsqueeze(-1)).squeeze(-1).T
-        inv_log_prob -= F.logsigmoid(u_inv).clamp(self.inf_logsigma, self.sup_logsigma)
+        inv_log_prob -= F.logsigmoid(u_inv/10).clamp(self.inf_logsigma, self.sup_logsigma)
         # inv_log_prob += F.logsigmoid(-u_inv).clamp(self.inf_logsigma, self.sup_logsigma)
         inv_log_prob -= torch.log(self.inventory_actions[1] - inv)
         # inv_log_prob += torch.log(self.inventory_actions[1] - states[:, 0].unsqueeze(1) + 1e-8) - torch.log(torch.tensor(10))
-        inv_log_prob += torch.log(torch.tensor(10))
+        # inv_log_prob += torch.log(torch.tensor(10))
         E_inv_log_prob = torch.mean(inv_log_prob, axis = 1).view(-1, 1)
         prc_log_prob = price_dist.log_prob(u_prc.T.unsqueeze(-1)).squeeze(-1).T
-        prc_log_prob -= F.logsigmoid(u_prc).clamp(self.inf_logsigma, self.sup_logsigma)
+        prc_log_prob -= F.logsigmoid(u_prc/10).clamp(self.inf_logsigma, self.sup_logsigma)
         prc_log_prob -= torch.log(self.price_actions[1] - price)
-        prc_log_prob += torch.log(torch.tensor(10))
+        # prc_log_prob += torch.log(torch.tensor(10))
         # prc_log_prob += F.logsigmoid(-u_prc).clamp(self.inf_logsigma, self.sup_logsigma)
         # prc_log_prob += torch.log(self.price_diff) - torch.log(torch.tensor(10))
         E_prc_log_prob = torch.mean(prc_log_prob, axis = 1).view(-1, 1)
@@ -1221,7 +1220,7 @@ class SAC:
 
             inv_ln_probs -= F.logsigmoid(actions[:, 0]/10).clamp(self.inf_logsigma, self.sup_logsigma).view(-1, 1)
             inv_ln_probs -= torch.log(self.inventory_actions[1] - inv)
-            inv_ln_probs += torch.log(torch.tensor(10))
+            # inv_ln_probs += torch.log(torch.tensor(10))
 
             # price_ln_probs += F.logsigmoid(actions[:, 1]).clamp(self.inf_logsigma, self.sup_logsigma)
             # price_ln_probs += F.logsigmoid(-actions[:, 1]).clamp(self.inf_logsigma, self.sup_logsigma)
@@ -1229,7 +1228,7 @@ class SAC:
 
             price_ln_probs -= F.logsigmoid(actions[:, 1]/10).clamp(self.inf_logsigma, self.sup_logsigma).view(-1, 1)
             price_ln_probs -= torch.log(self.price_actions[1] - price)
-            price_ln_probs += torch.log(torch.tensor(10))
+            # price_ln_probs += torch.log(torch.tensor(10))
 
             # Update Q^{target}
             td_target = self.calc_target_for_target(states)
@@ -1254,14 +1253,15 @@ class SAC:
             # Update policy network
             q1_value = self.critic_1(torch.cat([inv, price, states], dim = 1))
             q2_value = self.critic_2(torch.cat([inv, price, states], dim = 1))
-            actor_loss = torch.mean(self.log_alpha.detach().exp() * (inv_ln_probs + price_ln_probs) - torch.min(q1_value, q2_value))
+            actor_loss = torch.mean(self.log_alpha.exp() * (inv_ln_probs + price_ln_probs) - torch.min(q1_value, q2_value))
 
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
             self.actor_optimizer.step()
 
             # Update alpha value
-            alpha_loss = torch.mean((-(inv_ln_probs + price_ln_probs) - self.target_entropy).detach() * self.log_alpha.exp())
+            current_entropy = -(inv_ln_probs + price_ln_probs).mean()
+            alpha_loss = -self.log_alpha * (current_entropy.detach() - self.target_entropy)
             self.log_alpha_optimizer.zero_grad()
             alpha_loss.backward()
             self.log_alpha_optimizer.step()
