@@ -1011,6 +1011,7 @@ class SAC:
             epochs: int,
             alpha_lr: float,
             target_entropy: float,
+            target_scaling: float,
             tau: float,
             cuda_usage: bool,
             dtype = torch.float32,
@@ -1047,11 +1048,14 @@ class SAC:
         self.memory_size = N_epochs
         self.memory = []
         self.alpha_lr = alpha_lr
-        self.log_alpha = torch.tensor(1.0).to(self.device)
+        self.log_alpha = torch.tensor(10.0).to(self.device)
+        # self.alpha = torch.tensor(1.0).to(self.device)
         self.log_alpha.requires_grad = True
+        # self.alpha.requires_grad = True
         # set target entropy to -|A|
         self.target_entropy = target_entropy
         # self.alpha = -1e-3
+        self.target_scaling = target_scaling
 
         self.tau = tau
         self.MC_samples = MC_samples
@@ -1063,6 +1067,7 @@ class SAC:
         self.critic_2_optimizer = torch.optim.Adam(self.critic_2.parameters(), lr=critic_lr)
         self.target_optimizer = torch.optim.Adam(self.target.parameters(), lr=target_lr)
         self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=alpha_lr)
+        # self.log_alpha_optimizer = torch.optim.Adam([self.alpha], lr=alpha_lr)
 
 
     def __repr__(self):
@@ -1155,14 +1160,15 @@ class SAC:
         E_inv_log_prob = torch.mean(inv_log_prob, axis = 1).view(-1, 1)
         E_prc_log_prob = torch.mean(prc_log_prob, axis = 1).view(-1, 1)
 
-        target_target = E_Q_tensor - self.log_alpha.exp().detach() * (E_inv_log_prob + E_prc_log_prob)
-        # target_target = E_Q_tensor - self.alpha * (E_inv_log_prob + E_prc_log_prob)
+        # target_target = E_Q_tensor - self.log_alpha.exp().detach() * (E_inv_log_prob + E_prc_log_prob)
+        target_target = self.target_scaling * E_Q_tensor - (E_inv_log_prob + E_prc_log_prob)
+        # target_target = E_Q_tensor - self.alpha.detach() * (E_inv_log_prob + E_prc_log_prob)
         return target_target
 
 
     def calc_target(self, rewards, next_states):
         V = self.frozen_target(next_states)
-        target = rewards + self.gamma * V.detach()
+        target = self.target_scaling * rewards + self.gamma * V.detach()
         return target
 
 
@@ -1205,7 +1211,7 @@ class SAC:
 
             # Update Q^{target}
             td_target = self.calc_target_for_target(states)
-            target_loss = F.mse_loss(self.target(states), td_target.detach())
+            target_loss = 0.5 * F.mse_loss(self.target(states), td_target.detach())
 
             self.target_optimizer.zero_grad()
             target_loss.backward()
@@ -1213,8 +1219,8 @@ class SAC:
 
             # Update both Q-networks
             td_target = self.calc_target(rewards, next_states)
-            critic_1_loss = F.mse_loss(self.critic_1(torch.cat([seen_inv, seen_price, states], dim = 1)), td_target.detach())
-            critic_2_loss = F.mse_loss(self.critic_2(torch.cat([seen_inv, seen_price, states], dim = 1)), td_target.detach())
+            critic_1_loss = 0.5 * F.mse_loss(self.critic_1(torch.cat([seen_inv, seen_price, states], dim = 1)), td_target.detach())
+            critic_2_loss = 0.5 * F.mse_loss(self.critic_2(torch.cat([seen_inv, seen_price, states], dim = 1)), td_target.detach())
 
             self.critic_1_optimizer.zero_grad()
             critic_1_loss.backward()
@@ -1258,8 +1264,9 @@ class SAC:
             prc_log_prob += torch.log(torch.tensor(10))
             E_prc_log_prob = torch.mean(prc_log_prob, axis = 1).view(-1, 1)
 
-            actor_target = self.log_alpha.exp().detach() * (E_inv_log_prob + E_prc_log_prob) - E_Q_tensor
-            # actor_target = self.alpha * (E_inv_log_prob + E_prc_log_prob) - E_Q_tensor
+            # actor_target = self.log_alpha.exp().detach() * (E_inv_log_prob + E_prc_log_prob) - E_Q_tensor
+            actor_target = (E_inv_log_prob + E_prc_log_prob) - self.target_scaling * E_Q_tensor
+            # actor_target = self.alpha.detach() * (E_inv_log_prob + E_prc_log_prob) - E_Q_tensor
             actor_loss = torch.mean(actor_target)
 
             self.actor_optimizer.zero_grad()
@@ -1267,11 +1274,12 @@ class SAC:
             self.actor_optimizer.step()
 
             # Update alpha value
-            self.log_alpha_optimizer.zero_grad()
-            current_entropy = -(E_inv_log_prob + E_prc_log_prob).mean()
-            alpha_loss = -self.log_alpha * (current_entropy.detach() - self.target_entropy)
-            alpha_loss.backward()
-            self.log_alpha_optimizer.step()
+            # self.log_alpha_optimizer.zero_grad()
+            # current_entropy = -(E_inv_log_prob + E_prc_log_prob).mean()
+            # alpha_loss = self.log_alpha * (current_entropy.detach() - self.target_entropy)
+            # # alpha_loss = self.alpha * (current_entropy.detach() - self.target_entropy)
+            # alpha_loss.backward()
+            # self.log_alpha_optimizer.step()
 
             # Update Q^{target}(\cdot ; \bar{\psi})
             self.soft_update(self.target, self.frozen_target)
