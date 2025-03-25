@@ -245,8 +245,6 @@ for env in range(ENV):
     elif str(firms[0]) == "TN_DDQN":
         for t in tqdm(range(- MEMORY_VOLUME - batch_size, T), f"Раунд {env + 1}"):
         # for t in range(- MEMORY_VOLUME - batch_size, T):
-            # print("!!!!!!!!", t)
-            
             idxs = []
             for i in range(n):
                 state_i = mem.copy()
@@ -275,32 +273,8 @@ for env in range(ENV):
 
             doli = spros.distribution(p)
 
-            # pi = []
-            # pi_inv = []
-            # pi_price = []
-            # for i in range(n):
-                # pi_i = p[i] * doli[i] - c_i * (inv[i] - x_t[i]) - h_plus * max(0, inv[i] - doli[i]) - v_minus * min(0, doli[i] - inv[i])
-                # pi.append(pi_i)
-                # pi_inv_i = - c_i * (inv[i] - x_t[i]) - h_plus * max(0, inv[i] - doli[i]) - v_minus * min(0, doli[i] - inv[i])
-                # pi_price_i = p[i] * doli[i]
-                # pi_inv.append(pi_inv_i)
-                # pi_price.append(pi_price_i)
-            # print(inv - doli)
-
             pi = p * doli - c_i * (inv - np.array(x_t)) - h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
-
-            # print("Цены", p)
-            # print("Инв", inv)
-            # print("Было", x_t)
-            # print("Доли", doli)
-            # print("-"*100)
-            # print(p * doli)
-            # print(- c_i * (inv - np.array(x_t)))
-            # print("Вообще", inv - doli)
-            # print(- h_plus * np.maximum(0, inv - doli))
-            # print(v_minus * np.minimum(0, inv - doli))
-            # print("#"*100)
-
+            
             if len(learn) == MEMORY_VOLUME:
                 for i in range(n):
                     state_i = mem.copy()
@@ -324,10 +298,7 @@ for env in range(ENV):
                     }
 
                     firms[i].cache_experience(prev_state, idxs[i], pi[i], new_state)
-                    # firms[i].cache_experience(prev_state, idxs[i], (pi_inv[i], pi_price[i]), new_state)
-
-            # for i in range(n):
-            #     x_t[i] = max(0, inv[i] - doli[i])
+                    
             x_t = np.maximum(0, inv - doli)
 
             for i in range(n):
@@ -549,7 +520,9 @@ for env in range(ENV):
 
     elif str(firms[0]) == "SAC":
         total_t = -MEMORY_VOLUME
+        # total_t = -MEMORY_VOLUME - batch_size
         with tqdm(total = T + MEMORY_VOLUME, desc=f'Раунд {env + 1}') as pbar:
+        # with tqdm(total = T + MEMORY_VOLUME + batch_size, desc=f'Раунд {env + 1}') as pbar:
             while total_t < T:
                 if total_t < 0:
                     min_t = total_t
@@ -557,8 +530,9 @@ for env in range(ENV):
                 else:
                     min_t = total_t
                     max_t = min(total_t + N_epochs, T)
-                
+        
                 for t in range(min_t, max_t):
+                # for t in tqdm(range(- MEMORY_VOLUME - batch_size, T), f"Раунд {env + 1}"):
                     acts = []
                     iter_probs = []
                     
@@ -580,8 +554,8 @@ for env in range(ENV):
                         else:
                             u_inv = torch.distributions.Normal(0, 1).sample()
                             u_prc = torch.distributions.Normal(0, 1).sample()
-                            act_inv = x_t[i] + torch.sigmoid(u_inv/10) * (inventory[1] - x_t[i])
-                            act_price = prices[0] + torch.sigmoid(u_prc/10) * (prices[1] - prices[0])
+                            act_inv = x_t[i] + torch.sigmoid(u_inv) * (inventory[1] - x_t[i])
+                            act_price = prices[0] + torch.sigmoid(u_prc) * (prices[1] - prices[0])
                             acts_i = (act_inv, act_price)
                         
                         iter_probs.append((u_inv, u_prc))
@@ -638,7 +612,7 @@ for env in range(ENV):
                 else:
                     for i in range(n):
                         firms[i].update()
-                    
+
                     total_t = min(total_t + N_epochs, T)
 
     raw_price_history = np.array(raw_price_history)

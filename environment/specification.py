@@ -80,7 +80,7 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 100000, # 100000, 200000
+    "T": 10000, # 100000, 200000
     "ENV": 1,
     "n": 2,
     "m": 5,
@@ -250,11 +250,11 @@ e4 = {
         "epochs": 1,
         "MC_samples": 200,
         "gamma": e1["delta"],
-        "actor_lr": 1e-4,
-        "critic_lr": 3e-4,
-        "target_lr": 3e-4,
-        "alpha_lr": 3e-4,
-        "target_entropy": -2,
+        "actor_lr": 3e-4,
+        "critic_lr": 5e-4,
+        "target_lr": 5e-4,
+        "alpha_lr": 5e-3,
+        "target_entropy": -1000,
         "tau": 0.005,
         "cuda_usage": False,
     },
