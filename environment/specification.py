@@ -81,7 +81,7 @@ class demand_function:
 
 e1 = {
     "T": 200000, # 100000, 200000
-    "ENV": 100,
+    "ENV": 25,
     "n": 2,
     "m": 5,
     "delta": 0.95, # 0.95, 0.99
@@ -99,7 +99,7 @@ e1 = {
     "SUMMARY": True,
     "SHOW_PROM_RES": True,
     "SAVE_SUMMARY": True,
-    "RANDOM_SEED": 42,
+    "RANDOM_SEED": 65,
 }
 
 # Это чтобы я случайно не потерял все результаты симуляций
@@ -245,18 +245,17 @@ e4 = {
         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
         "inventory_actions": inventory,
         "price_actions": prices,
-        "batch_size": 256,         # 32, 64, 100, 128
-        "N_epochs": 1000,           # 100, 200, e1["T"]//100
+        "batch_size": 100,         # 32, 64, 100, 128
+        "N_epochs": 100,           # 100, 200, e1["T"]//100
         "epochs": 1,
-        "MC_samples": 100,
+        "MC_samples": 200,
         "gamma": e1["delta"],
         "actor_lr": 3e-4,
         "critic_lr": 3e-4,
-        "target_lr": 3e-4,
-        "alpha_lr": 5e-3,
-        "target_entropy": -2,
-        "target_scaling": 10,
-        "tau": 0.005,
+        "alpha_lr": 3e-4,
+        "target_entropy": -5,
+        "target_scaling": 1,
+        "tau": 0.05,
         "cuda_usage": False,
     },
     "MEMORY_VOLUME": MEMORY_VOLUME,

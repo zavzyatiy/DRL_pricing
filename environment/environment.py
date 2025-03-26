@@ -552,10 +552,10 @@ for env in range(ENV):
                             inv, price, u_inv, u_prc = firms[i].suggest_actions(firm_state)
                             acts_i = (inv, price)
                         else:
-                            u_inv = torch.distributions.Normal(0, 1).sample()
-                            u_prc = torch.distributions.Normal(0, 1).sample()
-                            act_inv = x_t[i] + torch.sigmoid(u_inv) * (inventory[1] - x_t[i])
-                            act_price = prices[0] + torch.sigmoid(u_prc) * (prices[1] - prices[0])
+                            u_inv = torch.distributions.Normal(0, 1).rsample()
+                            u_prc = torch.distributions.Normal(0, 1).rsample()
+                            act_inv = x_t[i] + torch.sigmoid(u_inv/10) * (inventory[1] - x_t[i])
+                            act_price = prices[0] + torch.sigmoid(u_prc/10) * (prices[1] - prices[0])
                             acts_i = (act_inv, act_price)
                         
                         iter_probs.append((u_inv, u_prc))
@@ -611,7 +611,7 @@ for env in range(ENV):
                     total_t = 0
                 else:
                     for i in range(n):
-                        firms[i].update()
+                        firms[i].update() # total_t//N_epochs
 
                     total_t = min(total_t + N_epochs, T)
 
