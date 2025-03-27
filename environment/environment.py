@@ -132,7 +132,7 @@ if VISUALIZE_THEORY:
     p_NE, p_M, pi_NE, pi_M = spros.get_theory(c_i)
     inv_NE, inv_M = spros.distribution([p_NE]*n)[0], spros.distribution([p_M]*n)[0]
 
-### ПОКА ВСЕ НАПИСАНО ДЛЯ "D"
+
 for env in range(ENV):
 
     raw_price_history = []
@@ -635,7 +635,11 @@ for env in range(ENV):
 
 if VISUALIZE or SAVE:
 
-    sgladit = int(0.05 * T)
+    if T == 10**6:
+        sgladit = int(10**4)
+    else:
+        sgladit = int(0.05 * T)
+    
     fig, ax = plt.subplots(1 + HAS_INV, 2 + (1 - HAS_INV) * int(profit_dynamic == "compare"), figsize= (20, 5*(1 + HAS_INV*1.1)))
 
     if HAS_INV == 0:
