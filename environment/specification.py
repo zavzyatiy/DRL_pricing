@@ -81,7 +81,7 @@ class demand_function:
 
 e1 = {
     "T": 200000, # 100000, 200000
-    "ENV": 25,
+    "ENV": 50,
     "n": 2,
     "m": 5,
     "delta": 0.95, # 0.95, 0.99
@@ -253,7 +253,7 @@ e4 = {
         "actor_lr": 3e-4,
         "critic_lr": 3e-4,
         "alpha_lr": 3e-4,
-        "target_entropy": -5,
+        "target_entropy": -2,
         "target_scaling": 1,
         "tau": 0.05,
         "cuda_usage": False,
