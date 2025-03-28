@@ -12,8 +12,9 @@ import os
 import json
 
 from firms_RL import epsilon_greedy, TQL, TN_DDQN, PPO_D, PPO_C, SAC
+from platform_RL import fixed_weights
 
-### Всевозможные модели спросов
+### Модель спроса
 class demand_function:
      
     def __init__(
@@ -22,10 +23,10 @@ class demand_function:
             mode: str,
             a: None,
             mu: None,
-            C: None,       
+            C: None,
 			):
 
-        mode_list = ["logit", "fixed", "PPO-C", "SAC"]
+        mode_list = ["logit"]
         assert n >= 2, "Demand is built for olygopoly, so n > 2!"
         assert mode in mode_list, f"Demand function must be in [{' '.join(mode_list)}]"
         self.n = n
@@ -54,24 +55,24 @@ class demand_function:
             res = exp_s/sum_exp
             return self.C * res[1:]
     
-    def get_theory(self, c_i):
-        precision = 0.0001
+    def get_theory(self, c_i, gamma, theta_d):
+        precision = 10**(-5)
         if self.mode == "logit":
             point_NE = 0
             c = 0
             while c == 0 or abs(point_NE - c) > precision:
                 point_NE = c
                 c = np.exp((point_NE - self.a)/self.mu)
-                c = c_i + self.mu * (self.n + c)/(self.n + c - 1)
+                c = (c_i + theta_d)/(1 - gamma) + self.mu * (self.n + c)/(self.n + c - 1)
             
-            point_M = self.a
+            point_M = self.a + self.mu
             c = 0
             while c == 0 or abs(point_M - c) > precision:
                 c = point_M
-                point_M = -self.mu * np.log(point_M - c_i - self.mu) + self.mu * np.log(self.mu * self.n) + self.a
+                point_M = -self.mu * np.log(point_M - (c_i + theta_d)/(1 - gamma) - self.mu) + self.mu * np.log(self.mu * self.n) + self.a
             
-            pi_NE = (point_NE - c_i)*self.distribution([point_NE]*self.n)[0]
-            pi_M = (point_M - c_i)*self.distribution([point_M]*self.n)[0]
+            pi_NE = ((1 - gamma) * point_NE - theta_d - c_i)*self.distribution([point_NE]*self.n)[0]
+            pi_M = ((1 - gamma) * point_M - theta_d - c_i)*self.distribution([point_M]*self.n)[0]
 
             return point_NE, point_M, pi_NE, pi_M
 
@@ -80,13 +81,14 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 100000, # 100000, 200000
-    "ENV": 100,
+    "T": 200000,         # 100000, 200000
+    "ENV": 200,
     "n": 2,
     "m": 5,
-    "delta": 0.95, # 0.95, 0.99
-    "gamma": 0.5,
-    "c_i": 1, # 0.25, 1
+    "delta": 0.95,      # 0.95, 0.99
+    "gamma": 0.1,
+    "theta_d": 0.043,
+    "c_i": 1,           # 0.25, 1
     "h_plus": 3,        # Из Zhou: примерно половина монопольной цены
     "v_minus": 3,       # Из Zhou: примерно четверть монопольной цены
     "eta": 0.05,
@@ -99,15 +101,15 @@ e1 = {
     "SUMMARY": True,
     "SHOW_PROM_RES": True,
     "SAVE_SUMMARY": True,
-    "RANDOM_SEED": 65,
+    "RANDOM_SEED": 42,
 }
 
 # Это чтобы я случайно не потерял все результаты симуляций
 e1["SAVE_SUMMARY"] = e1["SAVE_SUMMARY"] or ((e1["ENV"] >= 10) and (e1["T"] >= 10000))
 
 e2 = {
-    "p_inf": e1["c_i"],
-    "p_sup": 2.5,           # 2, 2.5
+    "p_inf": (e1["c_i"] + e1["theta_d"]) / (1 - e1["gamma"]),
+    "p_sup": (e1["c_i"] + e1["theta_d"]) / (1 - e1["gamma"]) + 1.5,    # 2, 2.5
     "arms_amo_price": 101,   # 21, 101
     "arms_amo_inv": 101,     # 21, 101
 }
@@ -116,9 +118,9 @@ e3 = {
     "demand_params":{
         "n": e1["n"],
         "mode": "logit",
-        "a": e1["c_i"] + 1,
+        "a": e2["p_inf"] + 1,
         "mu": 0.25,
-        "C": 30,
+        "C": 36,
     },
 }
 
@@ -159,55 +161,55 @@ ONLY_OWN = False
 ##########################
 ### TN_DDQN
 ##########################
-assert mode == "D"
-e4 = {
-    "prices": prices,
-    "inventory": inventory,
-    "firm_model": TN_DDQN,
-    "firm_params": {
-        "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
-        "inventory_actions": inventory,
-        "price_actions": prices,
-        "MEMORY_VOLUME": MEMORY_VOLUME,
-        "batch_size": 32, # 32
-        "gamma": e1["delta"],
-        "lr": 0.0001,
-        "eps": 0.4,
-        "mode": "zhou", # None, "sanchez_cartas", "zhou"
-        "target_update_freq": 100, # e1["T"]//100, 100
-        "memory_size": 1000, # 10000
-        "cuda_usage": True,
-        "eps_min": 0.01,
-        "eps_max": 1,
-        "beta": 1.5/(10**4),
-    },
-    "own": own,
-}
-##########################
-### PPO-D
-##########################
 # assert mode == "D"
 # e4 = {
 #     "prices": prices,
 #     "inventory": inventory,
-#     "firm_model": PPO_D,
+#     "firm_model": TN_DDQN,
 #     "firm_params": {
 #         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
 #         "inventory_actions": inventory,
 #         "price_actions": prices,
-#         "batch_size": 100,      # 32, 64, 100, 128
-#         "N_epochs": 100,        # 100, e1["T"]//100
-#         "epochs": 25,           # 25
+#         "MEMORY_VOLUME": MEMORY_VOLUME,
+#         "batch_size": 32, # 32
 #         "gamma": e1["delta"],
-#         "actor_lr": 0.00005,
-#         "critic_lr": 0.00005,
-#         "clip_eps": 0.2,
-#         "lmbda": 1,
+#         "lr": 0.0001,
+#         "eps": 0.4,
+#         "mode": "zhou", # None, "sanchez_cartas", "zhou"
+#         "target_update_freq": 100, # e1["T"]//100, 100
+#         "memory_size": 1000, # 10000
 #         "cuda_usage": True,
+#         "eps_min": 0.01,
+#         "eps_max": 1,
+#         "beta": 1.5/(10**4),
 #     },
-#     "MEMORY_VOLUME": MEMORY_VOLUME,
 #     "own": own,
 # }
+##########################
+### PPO-D
+##########################
+assert mode == "D"
+e4 = {
+    "prices": prices,
+    "inventory": inventory,
+    "firm_model": PPO_D,
+    "firm_params": {
+        "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+        "inventory_actions": inventory,
+        "price_actions": prices,
+        "batch_size": 100,      # 32, 64, 100, 128
+        "N_epochs": 100,        # 100, e1["T"]//100
+        "epochs": 25,           # 25
+        "gamma": e1["delta"],
+        "actor_lr": 0.00005,
+        "critic_lr": 0.00005,
+        "clip_eps": 0.2,
+        "lmbda": 1,
+        "cuda_usage": True,
+    },
+    "MEMORY_VOLUME": MEMORY_VOLUME,
+    "own": own,
+}
 ##########################
 ### PPO-C
 ##########################
@@ -220,9 +222,9 @@ e4 = {
 #         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
 #         "inventory_actions": inventory,
 #         "price_actions": prices,
-#         "batch_size": 100, # 32, 64, 100, 128
-#         "N_epochs": 100, # 100, 200, e1["T"]//100
-#         "epochs": 25, # 25
+#         "batch_size": 100,          # 32, 64, 100, 128
+#         "N_epochs": 100,            # 100, 200, e1["T"]//100
+#         "epochs": 25,               # 25
 #         "gamma": e1["delta"],
 #         "actor_lr": 0.00005,
 #         "critic_lr": 0.00005,
@@ -264,15 +266,25 @@ e4 = {
 ##########################
 ### No platform
 ##########################
-# e5 = {
-
-# }
+e5 = {
+    "PLATFORM": False,
+    "plat_params":{}
+}
 ##########################
 ### Fixed weights platform
 ##########################
-e5 = {
-
-}
+# e5 = {
+#     "PLATFORM": True,
+#     "plat_model": fixed_weights,
+#     "plat_params":{
+#         "weights": [1/3, 2/3],
+#         "memory_size": 100,
+#         "n": e1["n"],
+#         "p_inf": e2["p_inf"],
+#         "p_max": e2["p_sup"],
+#         "C": e3["demand_params"]["C"],
+#     }
+# }
 ##########################
 ### PPO-C platform
 ##########################

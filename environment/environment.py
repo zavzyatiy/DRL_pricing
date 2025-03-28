@@ -42,8 +42,10 @@ n = Environment["n"]
 m = Environment["m"]
 # коэффициент дисконтирования
 delta = Environment["delta"]
-# склонность доверия рекламе
+# Вознаграждение платформы
 gamma = Environment["gamma"]
+# Издержки на доставку товара
+theta_d = Environment["theta_d"]
 # издержки закупки товара
 c_i = Environment["c_i"]
 # издержки хранения остатков
@@ -121,39 +123,43 @@ elif str(M(**firm_params)) == "SAC":
     epochs = Environment["firm_params"]["epochs"]
     assert (N_epochs >= batch_size)
 
+# Инициализация памяти о сложившихся равновесиях
 Price_history = []
 Profit_history = []
 if HAS_INV == 1:
     Stock_history = []
 
+# Рассчет равновесий в случае конкуренции (равновесие по Нэшу)
+# и в случае полного картеля
 demand_params = Environment["demand_params"]
 spros = demand_function(**demand_params)
 if VISUALIZE_THEORY:
-    p_NE, p_M, pi_NE, pi_M = spros.get_theory(c_i)
+    p_NE, p_M, pi_NE, pi_M = spros.get_theory(c_i, gamma, theta_d)
     inv_NE, inv_M = spros.distribution([p_NE]*n)[0], spros.distribution([p_M]*n)[0]
 
+# Есть ли на рынке платформа?
+PLATFORM = Environment["PLATFORM"]
 
 for env in range(ENV):
 
+    # Промежуточные данные о сложившихся равновесиях
     raw_price_history = []
     raw_profit_history = []
     if HAS_INV == 1:
         raw_stock_history = []
 
     ### Инициализация однородных фирм
-
     firms = [deepcopy(M(**firm_params)) for i in range(n)]
-
+    # Память с прошлого хода
     mem = []
-
+    # Инициализация запасов на складах
     if HAS_INV == 1:
         x_t = np.array([0 for i in range(n)])
     
     ### Инициализация платформы
-    # -
-    
-    ### Инициализация памяти в отзывах
-    # -
+    if PLATFORM:
+        PL = Environment["plat_model"]
+        platform = PL(**Environment["plat_params"])
 
     ### Инициализация основного цикла
     if str(firms[0]) == "epsilon_greedy":
@@ -188,7 +194,6 @@ for env in range(ENV):
     
     elif str(firms[0]) == "TQL":
         for t in tqdm(range(-MEMORY_VOLUME, T), f"Раунд {env + 1}"):
-        # for t in range(-MEMORY_VOLUME, T):
             idx = []
             for i in range(n):
                 idx_i = firms[i].suggest()
@@ -273,8 +278,17 @@ for env in range(ENV):
 
             doli = spros.distribution(p)
 
-            pi = p * doli - c_i * (inv - np.array(x_t)) - h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
-            
+            if not PLATFORM:
+                pi = ((1 - gamma) * p - theta_d) * doli
+                pi -= c_i * (inv - np.array(x_t))
+                pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
+            else:
+                boosting = platform.suggest(p)
+                pi = ((1 - gamma) * p - theta_d) * doli * boosting
+                pi -= c_i * (inv - np.array(x_t))
+                pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
+                platform.cache_data(doli)
+
             if len(learn) == MEMORY_VOLUME:
                 for i in range(n):
                     state_i = mem.copy()
@@ -361,9 +375,17 @@ for env in range(ENV):
 
                     doli = spros.distribution(p)
 
-                    pi = p * doli - c_i * (inv - np.array(x_t)) - h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
-                    # print("-"*50)
-                    # print("Итерация", t, total_t)
+                    if not PLATFORM:
+                        pi = ((1 - gamma) * p - theta_d) * doli
+                        pi -= c_i * (inv - np.array(x_t))
+                        pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
+                    else:
+                        boosting = platform.suggest(p)
+                        pi = ((1 - gamma) * p - theta_d) * doli * boosting
+                        pi -= c_i * (inv - np.array(x_t))
+                        pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
+                        platform.cache_data(doli)
+                    
                     if len(learn) == MEMORY_VOLUME:
                         for i in range(n):
                             state_i = mem.copy()
@@ -469,9 +491,17 @@ for env in range(ENV):
 
                     doli = spros.distribution(p)
 
-                    pi = p * doli - c_i * (inv - np.array(x_t)) - h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
-                    # print("-"*50)
-                    # print("Итерация", t, total_t)
+                    if not PLATFORM:
+                        pi = ((1 - gamma) * p - theta_d) * doli
+                        pi -= c_i * (inv - np.array(x_t))
+                        pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
+                    else:
+                        boosting = platform.suggest(p)
+                        pi = ((1 - gamma) * p - theta_d) * doli * boosting
+                        pi -= c_i * (inv - np.array(x_t))
+                        pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
+                        platform.cache_data(doli)
+                    
                     if len(learn) == MEMORY_VOLUME:
                         for i in range(n):
                             state_i = mem.copy()
@@ -570,9 +600,19 @@ for env in range(ENV):
                     
                     inv = np.array([x[0] for x in acts])
                     p = np.array([x[1] for x in acts])
+
                     doli = spros.distribution(p)
 
-                    pi = p * doli - c_i * (inv - np.array(x_t)) - h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
+                    if not PLATFORM:
+                        pi = ((1 - gamma) * p - theta_d) * doli
+                        pi -= c_i * (inv - np.array(x_t))
+                        pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
+                    else:
+                        boosting = platform.suggest(p)
+                        pi = ((1 - gamma) * p - theta_d) * doli * boosting
+                        pi -= c_i * (inv - np.array(x_t))
+                        pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
+                        platform.cache_data(doli)
 
                     if len(learn) == MEMORY_VOLUME:
                         for i in range(n):
@@ -751,7 +791,9 @@ if VISUALIZE or SAVE:
             all_d = all_d / s[:, np.newaxis]
             all_d = all_d[:, 1:]
             stocks = np.concatenate((np.array([[0, 0]]), np.maximum(0, all_inv - all_d)))[:-1]
-            smoothed_pi = all_mv * all_d - c_i * (all_inv - stocks) - h_plus * np.maximum(0, all_inv - all_d) + v_minus * np.minimum(0, all_inv - all_d)
+            smoothed_pi = ((1 - gamma) * all_mv - theta_d) * all_d
+            smoothed_pi -= c_i * (all_inv - stocks)
+            smoothed_pi += - h_plus * np.maximum(0, all_inv - all_d) + v_minus * np.minimum(0, all_inv - all_d)
             # print("-"*100)
             # print(all_mv * all_d)
             # print(- c_i * (all_inv - stocks))
