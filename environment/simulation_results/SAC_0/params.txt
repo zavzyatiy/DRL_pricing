@@ -1,0 +1,76 @@
+{
+    "T": 200000,
+    "ENV": 200,
+    "n": 2,
+    "m": 5,
+    "delta": 0.95,
+    "gamma": 0.1,
+    "theta_d": 0.043,
+    "c_i": 1,
+    "h_plus": 3,
+    "v_minus": 3,
+    "eta": 0.05,
+    "color": [
+        "#FF7F00",
+        "#1874CD",
+        "#548B54",
+        "#CD2626",
+        "#CDCD00"
+    ],
+    "profit_dynamic": "compare",
+    "loc": "lower left",
+    "VISUALIZE_THEORY": true,
+    "VISUALIZE": true,
+    "SAVE": true,
+    "SUMMARY": true,
+    "SHOW_PROM_RES": true,
+    "SAVE_SUMMARY": true,
+    "RANDOM_SEED": 42, ### Из-за ограничений по мощностям усреднение было таким: {"RANDOM_SEED": 65, "ENV": 64}, {"RANDOM_SEED": 42, "ENV": 60}, {"RANDOM_SEED": 23, "ENV": 30}, {"RANDOM_SEED": 97, "ENV": 18}, {"RANDOM_SEED": 34, "ENV": 28}
+    "p_inf": 1.1588888888888889,
+    "p_sup": 2.658888888888889,
+    "arms_amo_price": 101,
+    "arms_amo_inv": 101,
+    "demand_params": {
+        "n": 2,
+        "mode": "logit",
+        "a": 2.158888888888889,
+        "mu": 0.25,
+        "C": 36
+    },
+    "prices": [
+        1.1588888888888889,
+        2.658888888888889
+    ],
+    "inventory": [
+        0,
+        36
+    ],
+    "firm_model": "SAC",
+    "firm_params": {
+        "state_dim": 2,
+        "inventory_actions": [
+            0,
+            36
+        ],
+        "price_actions": [
+            1.1588888888888889,
+            2.658888888888889
+        ],
+        "batch_size": 100,
+        "N_epochs": 100,
+        "epochs": 1,
+        "MC_samples": 200,
+        "gamma": 0.95,
+        "actor_lr": 0.0003,
+        "critic_lr": 0.0003,
+        "alpha_lr": 0.0003,
+        "target_entropy": -2,
+        "target_scaling": 1,
+        "tau": 0.05,
+        "cuda_usage": false
+    },
+    "MEMORY_VOLUME": 1,
+    "own": false,
+    "PLATFORM": false,
+    "plat_params": {}
+}
