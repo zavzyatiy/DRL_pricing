@@ -424,12 +424,13 @@ for env in range(ENV):
                 
                 if total_t < 0:
                     total_t = 0
-                else:
+                elif min(total_t + N_epochs, T) < T:
                     # print("#"*50)
                     for i in range(n):
                         # print("Обновление фирмы", i)
-                        firms[i].update()
-                    
+                        firms[i].update()   
+                    total_t = min(total_t + N_epochs, T)
+                else:
                     total_t = min(total_t + N_epochs, T)
                 
     elif str(firms[0]) == "PPO_C":
@@ -540,12 +541,13 @@ for env in range(ENV):
                 
                 if total_t < 0:
                     total_t = 0
-                else:
+                elif min(total_t + N_epochs, T) < T:
                     # print("#"*50)
                     for i in range(n):
                         # print("Обновление фирмы", i)
-                        firms[i].update()
-                    
+                        firms[i].update()   
+                    total_t = min(total_t + N_epochs, T)
+                else:
                     total_t = min(total_t + N_epochs, T)
 
     elif str(firms[0]) == "SAC":
@@ -649,10 +651,13 @@ for env in range(ENV):
                 
                 if total_t < 0:
                     total_t = 0
-                else:
+                elif min(total_t + N_epochs, T) < T:
+                    # print("#"*50)
                     for i in range(n):
-                        firms[i].update() # total_t//N_epochs
-
+                        # print("Обновление фирмы", i)
+                        firms[i].update()   
+                    total_t = min(total_t + N_epochs, T)
+                else:
                     total_t = min(total_t + N_epochs, T)
 
     raw_price_history = np.array(raw_price_history)

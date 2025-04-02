@@ -1012,8 +1012,8 @@ class SAC:
         self.actor = SAC_ActorNet(state_dim).to(self.device)            # Actor
         self.critic_1 = SAC_CriticNet_Q(state_dim, 2).to(self.device)   # Q_1
         self.critic_2 = SAC_CriticNet_Q(state_dim, 2).to(self.device)   # Q_2
-        self.target_critic_1 = SAC_CriticNet_Q(state_dim, 2).to(device) # First target Q-network
-        self.target_critic_2 = SAC_CriticNet_Q(state_dim, 2).to(device)
+        self.target_critic_1 = SAC_CriticNet_Q(state_dim, 2).to(self.device) # First target Q-network
+        self.target_critic_2 = SAC_CriticNet_Q(state_dim, 2).to(self.device)
 
         # Q_target parameters are frozen.
         self.target_critic_1.load_state_dict(self.critic_1.state_dict())
