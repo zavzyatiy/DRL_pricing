@@ -886,11 +886,12 @@ if SAVE_SUMMARY or VISUALIZE:
     
     if SAVE_SUMMARY:
         folders = []
+        num = Environment["folder_num"]
         for f in os.listdir("./DRL_pricing/environment/simulation_results/"):
-            if not("." in str(f)) and (str(firms[0]) in str(f)):
+            if not("." in str(f)) and (str(firms[0]) + "_" + num in str(f)):
                 folders.append(f)
-        
-        res_name = f"./DRL_pricing/environment/simulation_results/{str(firms[0])}_{len(folders) + 1}/"
+
+        res_name = f"./DRL_pricing/environment/simulation_results/{str(firms[0])}_{num}_{len(folders) + 1}/"
         
         if not os.path.exists(res_name):
             os.makedirs(res_name)
@@ -898,6 +899,7 @@ if SAVE_SUMMARY or VISUALIZE:
         with open(res_name + "params.txt", "w+", encoding="utf-8") as f:
             to_write = deepcopy(Environment)
             to_write["firm_model"] = str(firms[0])
+            to_write["plat_model"] = str(platform)
             to_write = convert_ndarray_to_list(to_write)
             json.dump(to_write, f, indent=4)
         
