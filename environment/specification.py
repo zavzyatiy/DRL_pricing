@@ -2,6 +2,7 @@
 ### для папки: cd DRL_pricing
 ### удалить локальные изменения: git reset --hard HEAD
 ### для докера: pip freeze > requirements.txt
+### source /mnt/data/venv_new/bin/activate
 
 import random
 import numpy as np
@@ -81,10 +82,10 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 100000,         # 100000, 200000
-    "ENV": 1,
+    "T": 200000,         # 100000, 200000
+    "ENV": 35,
     "n": 2,
-    "m": 5,
+    "m": 30,
     "delta": 0.95,      # 0.95, 0.99
     "gamma": 0.1,
     "theta_d": 0.043,
@@ -101,7 +102,7 @@ e1 = {
     "SUMMARY": True,
     "SHOW_PROM_RES": True,
     "SAVE_SUMMARY": True,
-    "RANDOM_SEED": 42,
+    "RANDOM_SEED": 23,
 }
 
 # Это чтобы я случайно не потерял все результаты симуляций
@@ -124,7 +125,7 @@ e3 = {
     },
 }
 
-mode = "D" # C, D
+mode = "C" # C, D
 
 if mode == "D":
     prices = np.linspace(e2["p_inf"], e2["p_sup"], e2["arms_amo_price"])
@@ -188,28 +189,28 @@ ONLY_OWN = False
 ##########################
 ### PPO-D
 ##########################
-assert mode == "D"
-e4 = {
-    "prices": prices,
-    "inventory": inventory,
-    "firm_model": PPO_D,
-    "firm_params": {
-        "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
-        "inventory_actions": inventory,
-        "price_actions": prices,
-        "batch_size": 128,          # 32, 64, 100, 128
-        "N_epochs": 256,            # 100, 200, e1["T"]//100
-        "epochs": 10,               # 25
-        "gamma": e1["delta"],
-        "actor_lr": 1.5 * 1e-4,
-        "critic_lr": 1.5 * 1e-4,
-        "clip_eps": 0.2,
-        "lmbda": 1,
-        "cuda_usage": False,
-    },
-    "MEMORY_VOLUME": MEMORY_VOLUME,
-    "own": own,
-}
+# assert mode == "D"
+# e4 = {
+#     "prices": prices,
+#     "inventory": inventory,
+#     "firm_model": PPO_D,
+#     "firm_params": {
+#         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+#         "inventory_actions": inventory,
+#         "price_actions": prices,
+#         "batch_size": 128,          # 32, 64, 100, 128
+#         "N_epochs": 256,            # 100, 200, e1["T"]//100
+#         "epochs": 10,               # 25
+#         "gamma": e1["delta"],
+#         "actor_lr": 1.5 * 1e-4,
+#         "critic_lr": 1.5 * 1e-4,
+#         "clip_eps": 0.2,
+#         "lmbda": 1,
+#         "cuda_usage": False,
+#     },
+#     "MEMORY_VOLUME": MEMORY_VOLUME,
+#     "own": own,
+# }
 ##########################
 ### PPO-C
 ##########################
@@ -238,31 +239,31 @@ e4 = {
 ##########################
 ### SAC
 ##########################
-# assert mode == "C"
-# e4 = {
-#     "prices": prices,
-#     "inventory": inventory,
-#     "firm_model": SAC,
-#     "firm_params": {
-#         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
-#         "inventory_actions": inventory,
-#         "price_actions": prices,
-#         "batch_size": 100,         # 32, 64, 100, 128
-#         "N_epochs": 100,           # 100, 200, e1["T"]//100
-#         "epochs": 1,
-#         "MC_samples": 200,
-#         "gamma": e1["delta"],
-#         "actor_lr": 3e-4,
-#         "critic_lr": 3e-4,
-#         "alpha_lr": 3e-4,
-#         "target_entropy": -2,
-#         "target_scaling": 1,
-#         "tau": 0.05,
-#         "cuda_usage": False,
-#     },
-#     "MEMORY_VOLUME": MEMORY_VOLUME,
-#     "own": own,
-# }
+assert mode == "C"
+e4 = {
+    "prices": prices,
+    "inventory": inventory,
+    "firm_model": SAC,
+    "firm_params": {
+        "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+        "inventory_actions": inventory,
+        "price_actions": prices,
+        "batch_size": 100,         # 32, 64, 100, 128
+        "N_epochs": 100,           # 100, 200, e1["T"]//100
+        "epochs": 1,
+        "MC_samples": 200,
+        "gamma": e1["delta"],
+        "actor_lr": 3e-4,
+        "critic_lr": 3e-4,
+        "alpha_lr": 3e-4,
+        "target_entropy": -2,
+        "target_scaling": 1,
+        "tau": 0.05,
+        "cuda_usage": False,
+    },
+    "MEMORY_VOLUME": MEMORY_VOLUME,
+    "own": own,
+}
 ##########################
 ### No platform
 ##########################
@@ -280,7 +281,7 @@ e5 = {
     "plat_model": fixed_weights,
     "plat_params":{
         "weights": [1/3, 2/3],
-        "memory_size": 30,
+        "memory_size": e1["m"],
         "n": e1["n"],
         "p_inf": e2["p_inf"],
         "p_max": e2["p_sup"],
@@ -311,10 +312,11 @@ Environment = e1 | e2 | e3 | e4 | e5
 # Price_history = []
 # Profit_history = []
 # Stock_history = []
-# GENERAL_RES = "TN_DDQN"
+# GENERAL_RES = "SAC"
+# num = "1"
 
-# for i in range(1, 2 + 1):
-#     folder_name = f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{i}/"
+# for i in range(1, 5 + 1):
+#     folder_name = f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_{i}/"
 #     a1, a2, a3 = np.load(folder_name + "Price_history.npy"), np.load(folder_name + "Profit_history.npy"), np.load(folder_name + "Stock_history.npy")
 #     Price_history = Price_history + a1.tolist()
 #     Profit_history = Profit_history + a2.tolist()
@@ -324,15 +326,15 @@ Environment = e1 | e2 | e3 | e4 | e5
 # Profit_history = np.array(Profit_history)
 # Stock_history = np.array(Stock_history)
 
-# np.save(f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_0/Price_history.npy", Price_history)
-# np.save(f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_0/Profit_history.npy", Profit_history)
-# np.save(f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_0/Stock_history.npy", Stock_history)
+# np.save(f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_0/Price_history.npy", Price_history)
+# np.save(f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_0/Profit_history.npy", Profit_history)
+# np.save(f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_0/Stock_history.npy", Stock_history)
 
 # print(len(Profit_history))
 
 # n = 2
-# res_name = f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_0/"
-# T = 100000
+# res_name = f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_0/"
+# T = 200000
 # HAS_INV = 1
 # c_i = Environment["c_i"]
 # gamma = Environment["gamma"]
