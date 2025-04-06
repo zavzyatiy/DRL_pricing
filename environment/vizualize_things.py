@@ -69,10 +69,10 @@ if KS:
             d = stats.mannwhitneyu(data_new[i][j].flatten(), data_old[i][j].flatten(), alternative="two-sided")
             if (d.pvalue < 0.1) and (b.pvalue < c.pvalue):
                 a = b
-                sign = "\\textbf{--}"
+                sign = "<"
             elif (d.pvalue < 0.1) and (b.pvalue > c.pvalue):
                 a = c
-                sign = "\\textbf{+}"
+                sign = ">"
             elif (d.pvalue >= 0.1):
                 a = d
                 sign = "0"
@@ -85,8 +85,8 @@ if KS:
             #     res2.cdf.plot(ax, color = "orange")
             #     plt.show()
             dots = "*" * int(a.pvalue < 0.1)  + "*" * int(a.pvalue < 0.05)  + "*" * int(a.pvalue < 0.01)
-            text = "$"* int(len(dots) > 0) + str(round(a.statistic, 2)) + ("^{" + dots + "}$") * int(len(dots) > 0)
-            text = "\makecell[c]{ " + text + (" \\\\ (" + sign + ") ") * int(sign != "0") +"\\\\[1ex] }" # + (" \\\\ (" + sign + ") ") * int(len(dots) > 0)
+            text = "$"* int(len(dots) > 0) + str(round(a.statistic, 2)) + ("^{" + dots + "}") * int(len(dots) > 0)
+            text = "\makecell[c]{ " + text + ("_{" + sign + "} $") * int(len(dots) > 0) +"\\\\[1ex] }" # + (" \\\\ (" + sign + ") ") * int(len(dots) > 0)
             dic[names[i]].append(text)
     
     df = pd.DataFrame(dic).T
