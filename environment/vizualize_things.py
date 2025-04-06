@@ -8,27 +8,96 @@ import numpy as np
 import os
 import matplotlib.gridspec as gridspec
 import pandas as pd
+from scipy import stats
 
 from specification import Environment, demand_function
 
 SHOW = False
 CREATE = False
-SQUEEZE = True
+SQUEEZE = False
+KS = True
+platform = "fixed"
+num = "1"
+files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
+files = [x.replace("_0", f"_{num}_0") for x in files]
+names = ["TN-DDQN", "PPO-D", "PPO-C", "SAC"]
+assert not(platform in ["None"])
 
-start = """\bgroup
+start_collusion = """\\bgroup
 \def\arraystretch{1.25}
 \begin{table}[H]
 \caption{Индексы сговора (по усред. последним 5\% итераций)}
 \label{tables:platforms_None}
 \begin{center}"""
 
-end = """\end{center}
+# \caption{Расчетные статистики теста Колмогорова-Смирнова согласованности распределений параметров равновесия по 5\% последних итераций}
+start_ks = """\\bgroup
+\def\arraystretch{1.25}
+\begin{table}[H]
+\caption{Расчетные статистики U-теста для распределений параметров равновесия по 5\% последних итераций}
+\label{tables:ks_fixed}
+\begin{center}"""
+
+end_collusion = """\end{center}
 \end{table}
 \egroup"""
 
-if CREATE:
+if KS:
     files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
-    names = ["TN-DDQN", "PPO-D", "PPO-C", "SAC"]
+    files = [x.replace("_0", "_0_0") for x in files]
+    Price_zero = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy") for x in files]
+    Profit_zero = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Profit_history.npy") for x in files]
+    Stock_zero = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Stock_history.npy") for x in files]
+    data = np.array([Price_zero, Stock_zero, Profit_zero])
+    data_old = data.transpose(1, 0, 2, 3)
+
+    files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
+    files = [x.replace("_0", f"_{num}_0") for x in files]
+    Price_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy") for x in files]
+    Profit_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Profit_history.npy") for x in files]
+    Stock_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Stock_history.npy") for x in files]
+    data = np.array([Price_list, Stock_list, Profit_list])
+    data_new = data.transpose(1, 0, 2, 3)
+
+    dic = {names[i]:[] for i in range(len(files))}
+
+    for i in range(len(files)):
+        for j in range(3):
+            # a = stats.ks_2samp(data_new[i][j].flatten(), data_old[i][j].flatten())
+            b = stats.mannwhitneyu(data_new[i][j].flatten(), data_old[i][j].flatten(), alternative='less')
+            c = stats.mannwhitneyu(data_new[i][j].flatten(), data_old[i][j].flatten(), alternative="greater")
+            d = stats.mannwhitneyu(data_new[i][j].flatten(), data_old[i][j].flatten(), alternative="two-sided")
+            if (d.pvalue < 0.1) and (b.pvalue < c.pvalue):
+                a = b
+                sign = "\\textbf{--}"
+            elif (d.pvalue < 0.1) and (b.pvalue > c.pvalue):
+                a = c
+                sign = "\\textbf{+}"
+            elif (d.pvalue >= 0.1):
+                a = d
+                sign = "0"
+            # if i in [1, 2] and j == 1:
+            #     print(b.pvalue, c.pvalue)
+            #     res1 = stats.ecdf(data_new[i][j].flatten())
+            #     res2 = stats.ecdf(data_old[i][j].flatten())
+            #     ax = plt.subplot()
+            #     res1.cdf.plot(ax, color = "blue")
+            #     res2.cdf.plot(ax, color = "orange")
+            #     plt.show()
+            dots = "*" * int(a.pvalue < 0.1)  + "*" * int(a.pvalue < 0.05)  + "*" * int(a.pvalue < 0.01)
+            text = "$"* int(len(dots) > 0) + str(round(a.statistic, 2)) + ("^{" + dots + "}$") * int(len(dots) > 0)
+            text = "\makecell[c]{ " + text + (" \\\\ (" + sign + ") ") * int(sign != "0") +"\\\\[1ex] }" # + (" \\\\ (" + sign + ") ") * int(len(dots) > 0)
+            dic[names[i]].append(text)
+    
+    df = pd.DataFrame(dic).T
+    # df.columns=["$KS_{price}$", "$KS_{inv}$", "$KS_{\pi}$"]
+    df.columns=["$U_{price}$", "$U_{inv}$", "$U_{\pi}$"]
+    print(start_ks)
+    print(df.to_latex())
+    print(end_collusion)
+
+
+if CREATE:
     dic = {names[i]:[] for i in range(len(files))}
     for i, x in enumerate(files):
         with open(f"./DRL_pricing/environment/simulation_results/{x}/summary.txt", "r+", encoding="utf-8") as f:
@@ -37,14 +106,12 @@ if CREATE:
         dic[names[i]] = mas
     df = pd.DataFrame(dic).T
     df.columns=["$\Delta_{price}$", "$\Delta_{inv}$", "$\Delta_{\pi}$"]
-    print(start)
+    print(start_collusion)
     print(df.to_latex())
-    print(end)
+    print(end_collusion)
 
 
 if SHOW:
-    files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
-    platform = "None"
     assert platform in ["None", "fixed", "PPO", "SAC"]
 
     Price_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy") for x in files]
@@ -105,7 +172,7 @@ if SHOW:
             )
 
             if i == 0:
-                ax.set_title(f'{files[j][:-2].replace("_", "-")}', fontsize= 20)
+                ax.set_title(names[j], fontsize= 20)
 
             # Скрыть числовые метки на осях
             # ax.set_xticks([])
@@ -152,8 +219,6 @@ if SHOW:
 
 
 if SQUEEZE:
-    files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
-    platform = "None"
     assert platform in ["None", "fixed", "PPO", "SAC"]
 
     Price_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy").flatten() for x in files]
@@ -186,7 +251,7 @@ if SQUEEZE:
             ax.hist(bins[:-1], bins, weights=counts, color = "#8B8B83") # , edgecolor='black'
 
             if i == 0:
-                ax.set_title(f'{files[j][:-2].replace("_", "-")}', fontsize= 20)
+                ax.set_title(names[j], fontsize= 20)
 
             ax.axvline(x=th[i][1], color='#00CD00', linestyle='--', linewidth=2, label = "M")
             ax.axvline(x=th[i][0], color='blue', linestyle='--', linewidth=2, label = "NE")
