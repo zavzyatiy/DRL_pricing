@@ -13,7 +13,7 @@ import os
 import json
 
 from firms_RL import epsilon_greedy, TQL, TN_DDQN, PPO_D, PPO_C, SAC
-from platform_RL import fixed_weights
+from platform_RL import fixed_weights, PPO_C_Platform
 
 ### Модель спроса
 class demand_function:
@@ -275,27 +275,41 @@ e4 = {
 ##########################
 ### Fixed weights platform
 ##########################
-e5 = {
-    "folder_num": "1",
-    "PLATFORM": True,
-    "plat_model": fixed_weights,
-    "plat_params":{
-        "weights": [1/3, 2/3],
-        "memory_size": e1["m"],
-        "n": e1["n"],
-        "p_inf": e2["p_inf"],
-        "p_max": e2["p_sup"],
-        "C": e3["demand_params"]["C"],
-    }
-}
+# e5 = {
+#     "folder_num": "1",
+#     "PLATFORM": True,
+#     "plat_model": fixed_weights,
+#     "plat_params":{
+#         "weights": [1/3, 2/3],
+#         "memory_size": e1["m"],
+#         "n": e1["n"],
+#         "p_inf": e2["p_inf"],
+#         "p_max": e2["p_sup"],
+#         "C": e3["demand_params"]["C"],
+#     }
+# }
 ##########################
 ### PPO-C platform
 ##########################
-# e5 = {
-#     "folder_num": "2",
-#     "PLATFORM": True,
-#     "plat_model": fixed_weights,
-# }
+e5 = {
+    "folder_num": "2",
+    "PLATFORM": True,
+    "plat_model": PPO_C_Platform,
+    "plat_params": {
+        "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+        "inventory_actions": inventory,
+        "price_actions": prices,
+        "batch_size": 128,          # 32, 64, 100, 128
+        "N_epochs": 256,            # 100, 200, e1["T"]//100
+        "epochs": 10,               # 25
+        "gamma": e1["delta"],
+        "actor_lr": 1.5 * 1e-4,
+        "critic_lr": 1.5 * 1e-4,
+        "clip_eps": 0.2,
+        "lmbda": 1,
+        "cuda_usage": False,
+        },
+}
 ##########################
 ### SAC platform
 ##########################

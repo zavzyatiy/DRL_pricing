@@ -139,6 +139,10 @@ if VISUALIZE_THEORY:
 
 # Есть ли на рынке платформа?
 PLATFORM = Environment["PLATFORM"]
+if PLATFORM:
+    PL = Environment["plat_model"]
+    platform = PL(**Environment["plat_params"])
+    DIFF_PL = (str(platform) == "PPO_C_Platform")
 
 for env in range(ENV):
 
