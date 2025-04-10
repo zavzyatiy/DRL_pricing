@@ -136,13 +136,16 @@ spros = demand_function(**demand_params)
 if VISUALIZE_THEORY:
     p_NE, p_M, pi_NE, pi_M = spros.get_theory(c_i, gamma, theta_d)
     inv_NE, inv_M = spros.distribution([p_NE]*n)[0], spros.distribution([p_M]*n)[0]
+C = demand_params["C"]
 
 # Есть ли на рынке платформа?
 PLATFORM = Environment["PLATFORM"]
 if PLATFORM:
     PL = Environment["plat_model"]
     platform = PL(**Environment["plat_params"])
-    DIFF_PL = (str(platform) == "PPO_C_Platform")
+    DIFF_PL = (str(platform) == "dynamic_weights")
+else:
+    platform = "None"
 
 for env in range(ENV):
 
@@ -439,6 +442,7 @@ for env in range(ENV):
                 
     elif str(firms[0]) == "PPO_C":
         total_t = -MEMORY_VOLUME
+        count_plat = 0
         with tqdm(total = T + MEMORY_VOLUME, desc=f'Раунд {env + 1}') as pbar:
             while total_t < T:
                 # for t in tqdm(range(- MEMORY_VOLUME - batch_size, T), f"Раунд {env + 1}"):
@@ -502,43 +506,70 @@ for env in range(ENV):
                         pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
                     else:
                         boosting = platform.suggest(p)
-                        pi = ((1 - gamma) * p - theta_d) * doli * boosting
+                        demand = doli * boosting.detach().numpy()
+                        pi = ((1 - gamma) * p - theta_d) * demand
                         pi -= c_i * (inv - np.array(x_t))
-                        pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
-                        platform.cache_data(doli)
+                        pi += -h_plus * np.maximum(0, inv - demand) + v_minus * np.minimum(0, inv - demand)
+                        # if t == max_t - 1:
+                        #     pi_plat = (gamma * p + theta_d) * demand
+                        #     pi_plat += (h_plus * np.maximum(0, inv - demand) - v_minus * np.minimum(0, inv - demand))/C
+                        #     pi_plat = np.sum(pi_plat)
+                        #     print(pi_plat)
+                        plat_info = {
+                            "boosting": boosting,
+                            # "demand": torch.tensor(doli.tolist()) * boosting,
+                            "demand": doli,
+                            'current_inventory': inv,
+                            "competitors_prices": p,
+                            "timestamp": max_t - 1 - t + t * int(count_plat %4 != 3),
+                        }
+                        platform.cache_data(plat_info)
                     
+                    # ### БЫЛО:
+                    # if len(learn) == MEMORY_VOLUME:
+                    #     for i in range(n):
+                    #         state_i = mem.copy()
+                    #         if len(state_i) == MEMORY_VOLUME and not(own):
+                    #             for j in range(MEMORY_VOLUME):
+                    #                 state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
+                            
+                    #         new = learn.copy()
+                    #         if len(new) == MEMORY_VOLUME and not(own):
+                    #             for j in range(MEMORY_VOLUME):
+                    #                 new[j] = new[j][: i] + new[j][i + 1 :]
+                            
+                    #         prev_state = {
+                    #             'current_inventory': x_t[i],
+                    #             'competitors_prices': state_i,
+                    #         }
+
+                    #         new_state = {
+                    #             'current_inventory': max(0, inv[i] - doli[i]),
+                    #             'competitors_prices': new,
+                    #         }
+
+                    #         firms[i].cache_experience(prev_state, iter_probs[i], pi[i], new_state)
+                        
+                    ### СТАЛО:
                     if len(learn) == MEMORY_VOLUME:
                         for i in range(n):
-                            state_i = mem.copy()
-                            if len(state_i) == MEMORY_VOLUME and not(own):
-                                for j in range(MEMORY_VOLUME):
-                                    state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
-                            
                             new = learn.copy()
                             if len(new) == MEMORY_VOLUME and not(own):
                                 for j in range(MEMORY_VOLUME):
                                     new[j] = new[j][: i] + new[j][i + 1 :]
-                            
-                            prev_state = {
-                                'current_inventory': x_t[i],
-                                'competitors_prices': state_i,
-                            }
 
                             new_state = {
                                 'current_inventory': max(0, inv[i] - doli[i]),
                                 'competitors_prices': new,
                             }
 
-                            firms[i].cache_experience(prev_state, iter_probs[i], pi[i], new_state)
-                            # print(f"Память фирмы {i}", firms[i].memory)
-                            
-                    # for i in range(n):
-                    #     x_t[i] = max(0, inv[i] - doli[i])
+                            firms[i].cache_experience(new_state, iter_probs[i], pi[i])
+
                     x_t = np.maximum(0, inv - doli)
                     
                     mem = learn.copy()
 
-                    pbar.update(1)
+                    # pbar.update(1)
                     raw_profit_history.append(pi)
                     raw_price_history.append(p)
                     raw_stock_history.append(inv)
@@ -548,8 +579,10 @@ for env in range(ENV):
                 elif min(total_t + N_epochs, T) < T:
                     # print("#"*50)
                     for i in range(n):
-                        # print("Обновление фирмы", i)
-                        firms[i].update()   
+                        firms[i].update()
+                    count_plat += 1
+                    if PLATFORM and count_plat %4 == 0:
+                        platform.update()
                     total_t = min(total_t + N_epochs, T)
                 else:
                     total_t = min(total_t + N_epochs, T)

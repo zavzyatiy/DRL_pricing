@@ -776,6 +776,7 @@ class PPO_C:
         self.memory_size = N_epochs
         self.lmbda = lmbda
         self.memory = []
+        self.index_list = [i for i in range(N_epochs)]
         
         self.actor_optimizer = torch.optim.Adam(self.c_actor_net.parameters(), lr=actor_lr)
         self.critic_optimizer = torch.optim.Adam(self.c_critic_net.parameters(), lr=critic_lr)
@@ -811,28 +812,53 @@ class PPO_C:
         return (inv.item(), price.item(), u_inv.item(), u_prc.item())
 
 
-    def cache_experience(self, state, actions, reward, next_state):
+    def cache_experience(self, state, actions, reward): # , next_state
         """Сохраняет опыт в replay buffer"""
-        state_vec = self._get_state_vector(state)
-        next_vec = self._get_state_vector(next_state)
+        # ### БЫЛО:
+        # state_vec = self._get_state_vector(state)
+        # next_vec = self._get_state_vector(next_state)
 
-        if len(self.memory) >= self.memory_size:
-            self.memory.pop(0)
+        ### СТАЛО:
+        state_vec = self._get_state_vector(state)
+
+        # ### БЫЛО:
+        # if len(self.memory) >= self.memory_size:
+        #     self.memory.pop(0)
+
+        # ### СТАЛО:
+        # if len(self.memory) >= self.memory_size + 1:
+        #     self.memory.pop(0)
         
+        # ### БЫЛО:
+        # if len(state_vec) == self.state_dim:
+        #     if not self.cuda_usage:
+        #         self.memory.append((
+        #             state_vec,
+        #             actions,
+        #             reward,
+        #             next_vec,
+        #         ))
+        #     else:
+        #         self.memory.append((
+        #             state_vec.cpu(),
+        #             torch.tensor(actions, dtype = self.dtype).to(self.device),
+        #             torch.tensor([reward], dtype = self.dtype).to(self.device),
+        #             next_vec.cpu(),
+        #         ))
+
+        ### СТАЛО:
         if len(state_vec) == self.state_dim:
             if not self.cuda_usage:
                 self.memory.append((
                     state_vec,
                     actions,
                     reward,
-                    next_vec,
                 ))
             else:
                 self.memory.append((
                     state_vec.cpu(),
                     torch.tensor(actions, dtype = self.dtype).to(self.device),
                     torch.tensor([reward], dtype = self.dtype).to(self.device),
-                    next_vec.cpu(),
                 ))
 
 
@@ -841,16 +867,31 @@ class PPO_C:
         if len(self.memory) < self.batch_size:
             return 0.0
         
+        # ### БЫЛО:
+        # if not self.cuda_usage:
+        #     all_states = torch.stack([x[0] for x in self.memory])
+        #     all_actions = torch.tensor([x[1] for x in self.memory])
+        #     all_rewards = torch.tensor([x[2] for x in self.memory], dtype = self.dtype).view(-1, 1)
+        #     all_next_states = torch.stack([x[3] for x in self.memory])
+        # else:
+        #     all_states = torch.stack([x[0] for x in self.memory]).to(self.device)
+        #     all_actions = torch.stack([x[1] for x in self.memory]).to(self.device)
+        #     all_rewards = torch.stack([x[2] for x in self.memory], dim = 1)[0].view(-1, 1).to(self.device)
+        #     all_next_states = torch.stack([x[3] for x in self.memory]).to(self.device)
+
+        ### СТАЛО:
         if not self.cuda_usage:
             all_states = torch.stack([x[0] for x in self.memory])
-            all_actions = torch.tensor([x[1] for x in self.memory])
-            all_rewards = torch.tensor([x[2] for x in self.memory], dtype = self.dtype).view(-1, 1)
-            all_next_states = torch.stack([x[3] for x in self.memory])
+            all_actions = torch.tensor([x[1] for x in self.memory])[1:]
+            all_rewards = torch.tensor([x[2] for x in self.memory], dtype = self.dtype).view(-1, 1)[1:]
+            all_next_states = all_states[1:]
+            all_states = all_states[:-1]
         else:
             all_states = torch.stack([x[0] for x in self.memory]).to(self.device)
-            all_actions = torch.stack([x[1] for x in self.memory]).to(self.device)
-            all_rewards = torch.stack([x[2] for x in self.memory], dim = 1)[0].view(-1, 1).to(self.device)
-            all_next_states = torch.stack([x[3] for x in self.memory]).to(self.device)
+            all_actions = torch.stack([x[1] for x in self.memory]).to(self.device)[1:]
+            all_rewards = torch.stack([x[2] for x in self.memory], dim = 1)[0].view(-1, 1).to(self.device)[1:]
+            all_next_states = all_states[1:]
+            all_states = all_states[:-1]
         
         td_target = all_rewards + self.gamma * self.c_critic_net(all_next_states)
         td_delta = td_target - self.c_critic_net(all_states)
@@ -876,11 +917,15 @@ class PPO_C:
             # old_price_ln_probs += F.logsigmoid(all_actions[:, 1])
             # old_price_ln_probs += torch.log(self.price_diff)
 
-        index_list = [i for i in range(len(self.memory))]
+        # ### БЫЛО:
+        # index_list = [i for i in range(len(self.memory))]
+
+        # ### СТАЛО:
+        # self.index_list = [i for i in range(len(self.memory) - 1)]
 
         for _ in range(self.epochs):
             # print("Итерация обновления", _)
-            batch = random.sample(index_list, self.batch_size)
+            batch = random.sample(self.index_list, self.batch_size)
             states = all_states[batch]
             actions = all_actions[batch]
             local_advantage = advantage[batch]
@@ -916,6 +961,8 @@ class PPO_C:
             self.actor_optimizer.step()
             self.critic_optimizer.step()
             # print("#"*40)
+
+        self.memory = [self.memory[-1]]
 
 
 class SAC_ActorNet(nn.Module):
