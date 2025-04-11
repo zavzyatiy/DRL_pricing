@@ -2,7 +2,8 @@
 ### для папки: cd DRL_pricing
 ### удалить локальные изменения: git reset --hard HEAD
 ### для докера: pip freeze > requirements.txt
-### source /mnt/data/venv_new/bin/activate
+### для сервака: source /mnt/data/venv_new/bin/activate
+### для сервака: python3 environment/environment.py
 
 import random
 import numpy as np
@@ -14,6 +15,7 @@ import json
 
 from firms_RL import epsilon_greedy, TQL, TN_DDQN, PPO_D, PPO_C, SAC
 from platform_RL import fixed_weights, dynamic_weights
+from scipy.special import expit
 
 ### Модель спроса
 class demand_function:
@@ -214,64 +216,64 @@ ONLY_OWN = False
 ##########################
 ### PPO-C
 ##########################
-assert mode == "C"
-e4 = {
-    "prices": prices,
-    "inventory": inventory,
-    "firm_model": PPO_C,
-    "firm_params": {
-        "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
-        "inventory_actions": inventory,
-        "price_actions": prices,
-        "batch_size": 128,          # 32, 64, 100, 128
-        "N_epochs": 256,            # 100, 200, e1["T"]//100
-        "epochs": 10,               # 25
-        "gamma": e1["delta"],
-        "actor_lr": 1.5 * 1e-4,
-        "critic_lr": 1.5 * 1e-4,
-        "clip_eps": 0.2,
-        "lmbda": 1,
-        "cuda_usage": False,
-    },
-    "MEMORY_VOLUME": MEMORY_VOLUME,
-    "own": own,
-}
-##########################
-### SAC
-##########################
 # assert mode == "C"
 # e4 = {
 #     "prices": prices,
 #     "inventory": inventory,
-#     "firm_model": SAC,
+#     "firm_model": PPO_C,
 #     "firm_params": {
 #         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
 #         "inventory_actions": inventory,
 #         "price_actions": prices,
-#         "batch_size": 100,         # 32, 64, 100, 128
-#         "N_epochs": 100,           # 100, 200, e1["T"]//100
-#         "epochs": 1,
-#         "MC_samples": 200,
+#         "batch_size": 128,          # 32, 64, 100, 128
+#         "N_epochs": 256,            # 100, 200, e1["T"]//100
+#         "epochs": 10,               # 25
 #         "gamma": e1["delta"],
-#         "actor_lr": 3e-4,
-#         "critic_lr": 3e-4,
-#         "alpha_lr": 3e-4,
-#         "target_entropy": -2,
-#         "target_scaling": 1,
-#         "tau": 0.05,
+#         "actor_lr": 1.5 * 1e-4,
+#         "critic_lr": 1.5 * 1e-4,
+#         "clip_eps": 0.2,
+#         "lmbda": 1,
 #         "cuda_usage": False,
 #     },
 #     "MEMORY_VOLUME": MEMORY_VOLUME,
 #     "own": own,
 # }
 ##########################
+### SAC
+##########################
+assert mode == "C"
+e4 = {
+    "prices": prices,
+    "inventory": inventory,
+    "firm_model": SAC,
+    "firm_params": {
+        "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+        "inventory_actions": inventory,
+        "price_actions": prices,
+        "batch_size": 100,         # 32, 64, 100, 128
+        "N_epochs": 100,           # 100, 200, e1["T"]//100
+        "epochs": 1,
+        "MC_samples": 200,
+        "gamma": e1["delta"],
+        "actor_lr": 3e-4,
+        "critic_lr": 3e-4,
+        "alpha_lr": 3e-4,
+        "target_entropy": -2,
+        "target_scaling": 1,
+        "tau": 0.05,
+        "cuda_usage": False,
+    },
+    "MEMORY_VOLUME": MEMORY_VOLUME,
+    "own": own,
+}
+##########################
 ### No platform
 ##########################
-# e5 = {
-#     "folder_num": "0",
-#     "PLATFORM": False,
-#     "plat_params":{}
-# }
+e5 = {
+    "folder_num": "0",
+    "PLATFORM": False,
+    "plat_params":{}
+}
 ##########################
 ### Fixed weights platform
 ##########################
@@ -291,26 +293,25 @@ e4 = {
 ##########################
 ### Dynamic weights platform
 ##########################
-e5 = {
-    "folder_num": "2",
-    "PLATFORM": True,
-    "plat_model": dynamic_weights,
-    "plat_params": {
-        "demand_memory_size": e1["m"],
-        "n": e1["n"],
-        "p_inf": e2["p_inf"],
-        "p_max": e2["p_sup"],
-        "C": e3["demand_params"]["C"],
-        "starting_weight": -float(np.log(2)),
-        "delta": e1["delta"],
-        "lr": 1 * 1e-3,
-        "cuda_usage": False,
-        "gamma": e1["gamma"],
-        "theta_d": e1["theta_d"],
-        "h_plus": e1["h_plus"],
-        "v_minus": e1["v_minus"],
-        },
-}
+# e5 = {
+#     "folder_num": "2",
+#     "PLATFORM": True,
+#     "plat_model": dynamic_weights,
+#     "plat_params": {
+#         "demand_memory_size": e1["m"],
+#         "n": e1["n"],
+#         "p_inf": e2["p_inf"],
+#         "p_max": e2["p_sup"],
+#         "C": e3["demand_params"]["C"],
+#         "starting_weight": -float(np.log(2)),
+#         "delta": e1["delta"],
+#         "lr": 1.5 * 1e-4,
+#         "gamma": e1["gamma"],
+#         "theta_d": e1["theta_d"],
+#         "h_plus": e1["h_plus"],
+#         "v_minus": e1["v_minus"],
+#         },
+# }
 
 
 Environment = e1 | e2 | e3 | e4 | e5

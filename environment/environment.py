@@ -2,6 +2,8 @@
 ### для папки: cd DRL_pricing
 ### удалить локальные изменения: git reset --hard HEAD
 ### для докера: pip freeze > requirements.txt
+### для сервака: source /mnt/data/venv_new/bin/activate
+### для сервака: python3 environment/environment.py
 
 import random
 import numpy as np
@@ -144,8 +146,11 @@ if PLATFORM:
     PL = Environment["plat_model"]
     platform = PL(**Environment["plat_params"])
     DIFF_PL = (str(platform) == "dynamic_weights")
+    if DIFF_PL:
+        Platform_history = []
 else:
     platform = "None"
+    DIFF_PL = False
 
 for env in range(ENV):
 
@@ -154,6 +159,8 @@ for env in range(ENV):
     raw_profit_history = []
     if HAS_INV == 1:
         raw_stock_history = []
+    if DIFF_PL:
+        raw_platform_history = []
 
     ### Инициализация однородных фирм
     firms = [deepcopy(M(**firm_params)) for i in range(n)]
@@ -345,12 +352,8 @@ for env in range(ENV):
                 
                 for t in range(min_t, max_t):
 
-                    # print("!!!", t)
-
                     idxs = []
-                    # print("ЗАПАСЫ", x_t)
                     for i in range(n):
-                        # print("Фирма:", i)
                         state_i = mem.copy()
 
                         if len(state_i) == MEMORY_VOLUME and not(own):
@@ -367,7 +370,7 @@ for env in range(ENV):
                         else:
                             idxs_i = (random.sample([i for i in range(len(inventory))], 1)[0],
                                       random.sample([i for i in range(len(prices))], 1)[0])
-                        # print("Действия", idxs_i)
+                            
                         idxs.append(idxs_i)
 
                     learn = mem.copy()
@@ -393,33 +396,45 @@ for env in range(ENV):
                         pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
                         platform.cache_data(doli)
                     
+                    # ### БЫЛО
+                    # if len(learn) == MEMORY_VOLUME:
+                    #     for i in range(n):
+                    #         state_i = mem.copy()
+                    #         if len(state_i) == MEMORY_VOLUME and not(own):
+                    #             for j in range(MEMORY_VOLUME):
+                    #                 state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
+                            
+                    #         new = learn.copy()
+                    #         if len(new) == MEMORY_VOLUME and not(own):
+                    #             for j in range(MEMORY_VOLUME):
+                    #                 new[j] = new[j][: i] + new[j][i + 1 :]
+                            
+                    #         prev_state = {
+                    #             'current_inventory': x_t[i],
+                    #             'competitors_prices': state_i,
+                    #         }
+
+                    #         new_state = {
+                    #             'current_inventory': max(0, inv[i] - doli[i]),
+                    #             'competitors_prices': new,
+                    #         }
+
+                    #         firms[i].cache_experience(prev_state, idxs[i], pi[i], new_state)
+
                     if len(learn) == MEMORY_VOLUME:
                         for i in range(n):
-                            state_i = mem.copy()
-                            if len(state_i) == MEMORY_VOLUME and not(own):
-                                for j in range(MEMORY_VOLUME):
-                                    state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
-                            
                             new = learn.copy()
                             if len(new) == MEMORY_VOLUME and not(own):
                                 for j in range(MEMORY_VOLUME):
                                     new[j] = new[j][: i] + new[j][i + 1 :]
-                            
-                            prev_state = {
-                                'current_inventory': x_t[i],
-                                'competitors_prices': state_i,
-                            }
 
                             new_state = {
                                 'current_inventory': max(0, inv[i] - doli[i]),
                                 'competitors_prices': new,
                             }
 
-                            firms[i].cache_experience(prev_state, idxs[i], pi[i], new_state)
-                            # print(f"Память фирмы {i}", firms[i].memory)
+                            firms[i].cache_experience(new_state, idxs[i], pi[i])
                             
-                    # for i in range(n):
-                    #     x_t[i] = max(0, inv[i] - doli[i])
                     x_t = np.maximum(0, inv - doli)
                     
                     mem = learn.copy()
@@ -432,9 +447,7 @@ for env in range(ENV):
                 if total_t < 0:
                     total_t = 0
                 elif min(total_t + N_epochs, T) < T:
-                    # print("#"*50)
                     for i in range(n):
-                        # print("Обновление фирмы", i)
                         firms[i].update()   
                     total_t = min(total_t + N_epochs, T)
                 else:
@@ -445,7 +458,6 @@ for env in range(ENV):
         count_plat = 0
         with tqdm(total = T + MEMORY_VOLUME, desc=f'Раунд {env + 1}') as pbar:
             while total_t < T:
-                # for t in tqdm(range(- MEMORY_VOLUME - batch_size, T), f"Раунд {env + 1}"):
                 if total_t < 0:
                     min_t = total_t
                     max_t = 0
@@ -455,13 +467,9 @@ for env in range(ENV):
                 
                 for t in range(min_t, max_t):
 
-                    # print("!!!", t)
-
                     acts = []
                     iter_probs = []
-                    # print("ЗАПАСЫ", x_t)
                     for i in range(n):
-                        # print("Фирма:", i)
                         state_i = mem.copy()
 
                         if len(state_i) == MEMORY_VOLUME and not(own):
@@ -482,8 +490,7 @@ for env in range(ENV):
                             act_inv = x_t[i] + torch.sigmoid(u_inv/10) * (inventory[1] - x_t[i])
                             act_price = prices[0] + torch.sigmoid(u_prc/10) * (prices[1] - prices[0])
                             acts_i = (act_inv, act_price)
-                        # print("Фирма", i)
-                        # print("iter_probs", (u_inv, u_prc))
+                        
                         iter_probs.append((u_inv, u_prc))
                         acts.append(acts_i)
 
@@ -496,7 +503,6 @@ for env in range(ENV):
                     
                     inv = np.array([x[0] for x in acts])
                     p = np.array([x[1] for x in acts])
-                    # print(p)
 
                     doli = spros.distribution(p)
 
@@ -505,27 +511,35 @@ for env in range(ENV):
                         pi -= c_i * (inv - np.array(x_t))
                         pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
                     else:
-                        boosting = platform.suggest(p)
-                        demand = doli * boosting.detach().numpy()
+                        # boosting = platform.suggest(p)
+                        # demand = doli * boosting.detach().numpy()
+                        # pi = ((1 - gamma) * p - theta_d) * demand
+                        # pi -= c_i * (inv - np.array(x_t))
+                        # pi += -h_plus * np.maximum(0, inv - demand) + v_minus * np.minimum(0, inv - demand)
+                        first, second, boosting = platform.suggest(p)
+                        demand = doli * boosting
                         pi = ((1 - gamma) * p - theta_d) * demand
                         pi -= c_i * (inv - np.array(x_t))
                         pi += -h_plus * np.maximum(0, inv - demand) + v_minus * np.minimum(0, inv - demand)
                         # if t == max_t - 1:
-                        #     pi_plat = (gamma * p + theta_d) * demand
-                        #     pi_plat += (h_plus * np.maximum(0, inv - demand) - v_minus * np.minimum(0, inv - demand))/C
-                        #     pi_plat = np.sum(pi_plat)
-                        #     print(pi_plat)
+                        pi_plat = (gamma * p + theta_d) * demand
+                        pi_plat += (h_plus * np.maximum(0, inv - demand) - v_minus * np.minimum(0, inv - demand))/C
+                        pi_plat = np.sum(pi_plat)
+                        # print(pi_plat)
                         plat_info = {
                             "boosting": boosting,
-                            # "demand": torch.tensor(doli.tolist()) * boosting,
-                            "demand": doli,
+                            "doli": doli,
+                            "demand": demand,
+                            "price_val": first,
+                            "inv_val": second,
                             'current_inventory': inv,
                             "competitors_prices": p,
-                            "timestamp": max_t - 1 - t + t * int(count_plat %4 != 3),
+                            "plat_pi": pi_plat,
+                            "timestamp": max_t - 1 - t + t * int(count_plat %2 != 1),
                         }
                         platform.cache_data(plat_info)
                     
-                    # ### БЫЛО:
+                    ### БЫЛО:
                     # if len(learn) == MEMORY_VOLUME:
                     #     for i in range(n):
                     #         state_i = mem.copy()
@@ -569,19 +583,20 @@ for env in range(ENV):
                     
                     mem = learn.copy()
 
-                    # pbar.update(1)
+                    pbar.update(1)
                     raw_profit_history.append(pi)
                     raw_price_history.append(p)
                     raw_stock_history.append(inv)
+                    if DIFF_PL:
+                        raw_platform_history.append(pi_plat)
                 
                 if total_t < 0:
                     total_t = 0
                 elif min(total_t + N_epochs, T) < T:
-                    # print("#"*50)
                     for i in range(n):
                         firms[i].update()
                     count_plat += 1
-                    if PLATFORM and count_plat %4 == 0:
+                    if PLATFORM and count_plat %2 == 0:
                         platform.update()
                     total_t = min(total_t + N_epochs, T)
                 else:
@@ -653,29 +668,43 @@ for env in range(ENV):
                         pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
                         platform.cache_data(doli)
 
+                    # if len(learn) == MEMORY_VOLUME:
+                    #     for i in range(n):
+                    #         state_i = mem.copy()
+                    #         if len(state_i) == MEMORY_VOLUME and not(own):
+                    #             for j in range(MEMORY_VOLUME):
+                    #                 state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
+                            
+                    #         new = learn.copy()
+                    #         if len(new) == MEMORY_VOLUME and not(own):
+                    #             for j in range(MEMORY_VOLUME):
+                    #                 new[j] = new[j][: i] + new[j][i + 1 :]
+                            
+                    #         prev_state = {
+                    #             'current_inventory': x_t[i],
+                    #             'competitors_prices': state_i,
+                    #         }
+
+                    #         new_state = {
+                    #             'current_inventory': max(0, inv[i] - doli[i]),
+                    #             'competitors_prices': new,
+                    #         }
+                            
+                    #         firms[i].cache_experience(prev_state, iter_probs[i], pi[i], new_state)
+
                     if len(learn) == MEMORY_VOLUME:
                         for i in range(n):
-                            state_i = mem.copy()
-                            if len(state_i) == MEMORY_VOLUME and not(own):
-                                for j in range(MEMORY_VOLUME):
-                                    state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
-                            
                             new = learn.copy()
                             if len(new) == MEMORY_VOLUME and not(own):
                                 for j in range(MEMORY_VOLUME):
                                     new[j] = new[j][: i] + new[j][i + 1 :]
-                            
-                            prev_state = {
-                                'current_inventory': x_t[i],
-                                'competitors_prices': state_i,
-                            }
 
                             new_state = {
                                 'current_inventory': max(0, inv[i] - doli[i]),
                                 'competitors_prices': new,
                             }
-                            
-                            firms[i].cache_experience(prev_state, iter_probs[i], pi[i], new_state)
+
+                            firms[i].cache_experience(new_state, iter_probs[i], pi[i])
                     
                     x_t = np.maximum(0, inv - doli)
                     
@@ -701,6 +730,8 @@ for env in range(ENV):
     raw_profit_history = np.array(raw_profit_history)
     if HAS_INV == 1:
         raw_stock_history = np.array(raw_stock_history)
+    if DIFF_PL:
+        raw_platform_history = np.array(raw_platform_history)
 
     Price_history.append(tuple([np.mean(raw_price_history[-int(T/20):, i]) for i in range(n)]))
     Profit_history.append(tuple([np.mean(raw_profit_history[-int(T/20):, i]) for i in range(n)]))
@@ -709,6 +740,9 @@ for env in range(ENV):
     if HAS_INV == 1:
         Stock_history.append(tuple([np.mean(raw_stock_history[-int(T/20):, i]) for i in range(n)]))
         print(Stock_history[-1])
+    if DIFF_PL:
+        Platform_history.append(np.mean(raw_platform_history[-int(T/20):]))
+        print(Platform_history[-1])
     if SHOW_PROM_RES:
         print(Profit_history[-1])
         print("-"*100)
@@ -826,47 +860,62 @@ if VISUALIZE or SAVE:
             c = c_i * np.ones(all_mv.shape)
             smoothed_pi = (all_mv - c) * all_d
         else:
-            zeros_column = a * np.ones((all_mv.shape[0], 1), dtype=all_mv.dtype)
-            all_d = np.hstack((zeros_column, all_mv))
-            all_d = np.exp((a-all_d)/mu)
-            s = np.sum(all_d, axis = 1)
-            all_d = all_d / s[:, np.newaxis]
-            all_d = all_d[:, 1:]
-            stocks = np.concatenate((np.array([[0, 0]]), np.maximum(0, all_inv - all_d)))[:-1]
-            smoothed_pi = ((1 - gamma) * all_mv - theta_d) * all_d
-            smoothed_pi -= c_i * (all_inv - stocks)
-            smoothed_pi += - h_plus * np.maximum(0, all_inv - all_d) + v_minus * np.minimum(0, all_inv - all_d)
-            # print("-"*100)
-            # print(all_mv * all_d)
-            # print(- c_i * (all_inv - stocks))
-            # print(- h_plus * np.maximum(0, all_inv - all_d))
-            # print(v_minus * np.minimum(0, all_inv - all_d))
-
-        for i in range(n):
-            mv = smoothed_pi[:, i]
-            if profit_dynamic == "compare":
-                plotThird.plot(mv, c = color[i], label = f"Фирма {i + 1}") # , linewidth= 0.2)
+            if not DIFF_PL:
+                zeros_column = a * np.ones((all_mv.shape[0], 1), dtype=all_mv.dtype)
+                all_d = np.hstack((zeros_column, all_mv))
+                all_d = np.exp((a-all_d)/mu)
+                s = np.sum(all_d, axis = 1)
+                all_d = all_d / s[:, np.newaxis]
+                all_d = all_d[:, 1:]
+                stocks = np.concatenate((np.array([[0, 0]]), np.maximum(0, all_inv - all_d)))[:-1]
+                smoothed_pi = ((1 - gamma) * all_mv - theta_d) * all_d
+                smoothed_pi -= c_i * (all_inv - stocks)
+                smoothed_pi += - h_plus * np.maximum(0, all_inv - all_d) + v_minus * np.minimum(0, all_inv - all_d)
             else:
-                plotSecond.plot(mv, c = color[i], label = f"Фирма {i + 1}") # , linewidth= 0.2)
-    
-        if profit_dynamic != "compare":
-            if VISUALIZE_THEORY:
-                plotSecond.plot([pi_NE]*len(mv), c = "#6C7B8B", linestyle = "--", label = "NE, M")
-                plotSecond.plot([pi_M]*len(mv), c = "#6C7B8B", linestyle = "--")
-
-            plotSecond.set_title("Динамика прибылей")
-            plotSecond.set_ylabel(f'Прибыль по сглаженной цене')
-            plotSecond.set_xlabel('Итерация')
-            plotSecond.legend(loc = loc)
+                mv = np.convolve(raw_platform_history, kernel, mode='valid')
+                smoothed_pi = deepcopy(mv)
+            
+        if not DIFF_PL:
+            for i in range(n):
+                mv = smoothed_pi[:, i]
+                if profit_dynamic == "compare":
+                    plotThird.plot(mv, c = color[i], label = f"Фирма {i + 1}") # , linewidth= 0.2)
+                else:
+                    plotSecond.plot(mv, c = color[i], label = f"Фирма {i + 1}") # , linewidth= 0.2)
         else:
-            if VISUALIZE_THEORY:
-                plotThird.plot([pi_NE]*len(mv), c = "#6C7B8B", linestyle = "--", label = "NE, M")
-                plotThird.plot([pi_M]*len(mv), c = "#6C7B8B", linestyle = "--")
+            if profit_dynamic == "compare":
+                plotThird.plot(smoothed_pi) #, label = "Платформа") # , linewidth= 0.2)
+            else:
+                plotSecond.plot(smoothed_pi) #, label = "Платформа") # , linewidth= 0.2)
 
-            plotThird.set_title("Динамика прибылей")
-            plotThird.set_ylabel(f'Прибыль по сглаженной цене' + HAS_INV*" и запасам")
-            plotThird.set_xlabel('Итерация')
-            plotThird.legend(loc = loc)
+        if not DIFF_PL:
+            if profit_dynamic != "compare":
+                if VISUALIZE_THEORY:
+                    plotSecond.plot([pi_NE]*len(mv), c = "#6C7B8B", linestyle = "--", label = "NE, M")
+                    plotSecond.plot([pi_M]*len(mv), c = "#6C7B8B", linestyle = "--")
+
+                plotSecond.set_title("Динамика прибылей")
+                plotSecond.set_ylabel(f'Прибыль по сглаженной цене')
+                plotSecond.set_xlabel('Итерация')
+                plotSecond.legend(loc = loc)
+            else:
+                if VISUALIZE_THEORY:
+                    plotThird.plot([pi_NE]*len(mv), c = "#6C7B8B", linestyle = "--", label = "NE, M")
+                    plotThird.plot([pi_M]*len(mv), c = "#6C7B8B", linestyle = "--")
+
+                plotThird.set_title("Динамика прибылей")
+                plotThird.set_ylabel(f'Прибыль по сглаженной цене' + HAS_INV*" и запасам")
+                plotThird.set_xlabel('Итерация')
+                plotThird.legend(loc = loc)
+        else:
+            if profit_dynamic != "compare":
+                plotSecond.set_title("Динамика прибыли платформы")
+                plotSecond.set_ylabel(f'Сглаженная прибыль (скользящее среднее по {window_size})')
+                plotSecond.set_xlabel('Итерация')
+            else:
+                plotThird.set_title("Динамика прибыли платформы")
+                plotThird.set_ylabel(f'Сглаженная прибыль (скользящее среднее по {window_size})')
+                plotThird.set_xlabel('Итерация')
 
 
 if SUMMARY:
@@ -879,6 +928,10 @@ if SUMMARY:
     if HAS_INV == 1:
         Stock_history = np.array(Stock_history)
         print(f"Среднии запасы по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)]))
+
+    if DIFF_PL:
+        Platform_history = np.array(Platform_history)
+        print(f"Средняя прибыль платформы по последним {int(T/20)} раундов:", str(round(np.mean(Platform_history), 3)))
 
     print(f"Средняя прибыль по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)]))
 
