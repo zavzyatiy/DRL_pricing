@@ -12,7 +12,7 @@ import torch
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from copy import deepcopy
-import os
+import inspect, os
 import json
 
 # from firms_RL import epsilon_greedy, TQL
@@ -977,12 +977,13 @@ if SAVE_SUMMARY or VISUALIZE:
     if SAVE_SUMMARY:
         folders = []
         num = Environment["folder_num"]
-        for f in os.listdir("./DRL_pricing/environment/simulation_results/"):
+        dest = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))) + "/simulation_results/"
+        for f in os.listdir(dest):
             if not("." in str(f)) and (str(firms[0]) + "_" + num in str(f)):
                 folders.append(f)
 
-        res_name = f"./DRL_pricing/environment/simulation_results/{str(firms[0])}_{num}_{len(folders) + 1}/"
-        
+        res_name = dest + f"/{str(firms[0])}_{num}_{len(folders) + 1}/"
+
         if not os.path.exists(res_name):
             os.makedirs(res_name)
 
