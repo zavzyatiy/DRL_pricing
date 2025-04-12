@@ -142,20 +142,13 @@ C = demand_params["C"]
 
 # Есть ли на рынке платформа?
 PLATFORM = Environment["PLATFORM"]
-# if PLATFORM:
-#     PL = Environment["plat_model"]
-#     platform = PL(**Environment["plat_params"])
-#     DIFF_PL = (str(platform) == "dynamic_weights")
-#     if DIFF_PL:
-#         Platform_history = []
-# else:
-#     platform = "None"
-#     DIFF_PL = False
 PL = Environment["plat_model"]
 platform = PL(**Environment["plat_params"])
 DIFF_PL = (str(platform) == "dynamic_weights")
+plat_epochs = 1
 if DIFF_PL:
     Platform_history = []
+    plat_epochs = Environment["plat_params"]["N_epochs"]
 
 def calc_profit_no_plat(gamma, p, theta_d, doli, c_i,
                         inv, x_t, h_plus, v_minus, C, boosting):
@@ -170,8 +163,8 @@ def calc_profit_with_plat(gamma, p, theta_d, doli, c_i,
     pi = ((1 - gamma) * p - theta_d) * demand
     pi -= c_i * (inv - x_t)
     pi += -h_plus * np.maximum(0, inv - demand) + v_minus * np.minimum(0, inv - demand)
-    pi_plat = (gamma * p + theta_d) * demand
-    pi_plat += (h_plus * np.maximum(0, inv - demand) - v_minus * np.minimum(0, inv - demand))/C
+    pi_plat = (gamma * p + 0.8 * theta_d) * demand
+    pi_plat += 0.5 * (h_plus * np.maximum(0, inv - demand) - v_minus * np.minimum(0, inv - demand)) / max(h_plus, v_minus)
     pi_plat = np.sum(pi_plat)
     return (pi, pi_plat)
 
@@ -285,7 +278,9 @@ for env in range(ENV):
 
             for i in range(n):
                 firms[i].update()
-            platform.update()
+            
+            if 0 < t and t % plat_epochs == 0:
+                platform.update()
 
             mem = learn.copy()
 
@@ -348,7 +343,7 @@ for env in range(ENV):
                         "stock": np.array(x_t),
                         "inv": inv,
                     }
-                    first, second, u_alpha, boosting = platform.suggest(plat_info)
+                    first, second, w, boosting = platform.suggest(plat_info)
                     pi, pi_plat = profit_func(gamma, p, theta_d, doli, c_i, inv, np.array(x_t), h_plus, v_minus, C, boosting)
                     plat_info = {
                         "doli": doli,
@@ -358,7 +353,7 @@ for env in range(ENV):
                         "second": second,
                         "stock": np.array(x_t),
                         "inv": inv,
-                        "action": u_alpha,
+                        "action": w,
                         "plat_pi": pi_plat,
                     }
                     demand = doli * boosting
@@ -387,7 +382,7 @@ for env in range(ENV):
                     raw_price_history.append(p)
                     raw_stock_history.append(inv)
                     if DIFF_PL:
-                        raw_platform_history.append((pi_plat, u_alpha/10))
+                        raw_platform_history.append((pi_plat, w))
                 
                 if total_t < 0:
                     total_t = 0
@@ -610,14 +605,15 @@ for env in range(ENV):
                     raw_stock_history.append(inv)
                     if DIFF_PL:
                         raw_platform_history.append((pi_plat, u_alpha/10))
+                    
+                    if 0 < t and t % plat_epochs == 0:
+                        platform.update()
                 
                 if total_t < 0:
                     total_t = 0
                 elif min(total_t + N_epochs, T) < T:
                     for i in range(n):
                         firms[i].update()
-
-                    platform.update()
                     total_t = min(total_t + N_epochs, T)
                 else:
                     total_t = min(total_t + N_epochs, T)

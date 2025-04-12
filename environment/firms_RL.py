@@ -290,6 +290,28 @@ if False:
     #         raw_profit_history.append(pi)
     #         raw_price_history.append(p)
 
+    ##########################
+    ### TQL
+    ##########################
+    # assert mode == "D"
+    # e4 = {
+    #     "prices": prices,
+    #     "firm_model": TQL, # epsilon_greedy
+    #     "firm_params": {
+    #         "eps": 0.4,
+    #         "Q_mat": np.zeros((len(prices)**(MEMORY_VOLUME * (e1["n"] - (1 - int(own)))), len(prices))),
+    #         "MEMORY_VOLUME": MEMORY_VOLUME,
+    #         "n": e1["n"],
+    #         "own": own,
+    #         "ONLY_OWN": ONLY_OWN,
+    #         "index_list": [x for x in range(len(prices)**MEMORY_VOLUME)],
+    #         "action_list": prices,
+    #         "delta": e1["delta"],
+    #         "alpha": 0.15,
+    #         "mode": "zhou", # None, "sanchez_cartas", "zhou"
+    #     },
+    # }
+
 
 class DQNet(nn.Module):
     """
@@ -642,14 +664,14 @@ class PPO_D:
 
     def _get_state_vector(self, firm_state):
         """Преобразует состояние фирмы в тензор"""
-        if not self.cuda_usage:
-            inventory = firm_state['current_inventory']
-            comp_prices = np.array(firm_state['competitors_prices']).flatten()
-            return torch.tensor([inventory] + comp_prices.tolist(), dtype=self.dtype, device=self.device)
-        else:
-            inventory = firm_state['current_inventory']
-            comp_prices = np.array(firm_state['competitors_prices']).flatten()
-            return torch.tensor([inventory] + comp_prices.tolist(), dtype=self.dtype, device=self.device)
+        # if not self.cuda_usage:
+        #     inventory = firm_state['current_inventory']
+        #     comp_prices = np.array(firm_state['competitors_prices']).flatten()
+        #     return torch.tensor([inventory] + comp_prices.tolist(), dtype=self.dtype, device=self.device)
+        # else:
+        inventory = firm_state['current_inventory']
+        comp_prices = np.array(firm_state['competitors_prices']).flatten()
+        return torch.tensor([inventory] + comp_prices.tolist(), dtype=self.dtype, device=self.device)
 
 
     def suggest_actions(self, firm_state):
@@ -733,17 +755,19 @@ class PPO_D:
             all_states = torch.stack([x[0] for x in self.memory])
             all_actions = torch.tensor([x[1] for x in self.memory])[1:]
             all_rewards = torch.tensor([x[2] for x in self.memory], dtype = self.dtype).view(-1, 1)[1:]
-            all_next_states = all_states[1:]
-            all_states = all_states[:-1]
+            # all_next_states = all_states[1:]
+            # all_states = all_states[:-1]
         else:
             all_states = torch.stack([x[0] for x in self.memory]).to(self.device)
             all_actions = torch.stack([x[1] for x in self.memory]).to(self.device)[1:]
             all_rewards = torch.stack([x[2] for x in self.memory], dim = 1)[0].view(-1, 1).to(self.device)[1:]
-            all_next_states = all_states[1:]
-            all_states = all_states[:-1]
+            # all_next_states = all_states[1:]
+            # all_states = all_states[:-1]
         
-        td_target = all_rewards + self.gamma * self.d_critic_net(all_next_states)
-        td_delta = td_target - self.d_critic_net(all_states)
+        prom = self.d_critic_net(all_states)
+        td_target = all_rewards + self.gamma * prom[1:]
+        td_delta = td_target - prom[:-1]
+        all_states = all_states[:-1]
         advantage = compute_advantage(self.gamma, self.lmbda, td_delta.cpu()).to(self.device)
 
         with torch.no_grad():

@@ -15,7 +15,6 @@ import json
 
 from firms_RL import epsilon_greedy, TQL, TN_DDQN, PPO_D, PPO_C, SAC
 from platform_RL import no_platform, fixed_weights, dynamic_weights
-from scipy.special import expit
 
 ### Модель спроса
 class demand_function:
@@ -84,8 +83,8 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 100000,         # 100000, 200000
-    "ENV": 5,
+    "T": 1000,         # 100000, 200000
+    "ENV": 1,
     "n": 2,
     "m": 30,
     "delta": 0.95,      # 0.95, 0.99
@@ -127,7 +126,7 @@ e3 = {
     },
 }
 
-mode = "D" # C, D
+mode = "C" # C, D
 
 if mode == "D":
     prices = np.linspace(e2["p_inf"], e2["p_sup"], e2["arms_amo_price"])
@@ -140,27 +139,6 @@ MEMORY_VOLUME = 1
 own = False
 ONLY_OWN = False
 
-##########################
-### TQL
-##########################
-# assert mode == "D"
-# e4 = {
-#     "prices": prices,
-#     "firm_model": TQL, # epsilon_greedy
-#     "firm_params": {
-#         "eps": 0.4,
-#         "Q_mat": np.zeros((len(prices)**(MEMORY_VOLUME * (e1["n"] - (1 - int(own)))), len(prices))),
-#         "MEMORY_VOLUME": MEMORY_VOLUME,
-#         "n": e1["n"],
-#         "own": own,
-#         "ONLY_OWN": ONLY_OWN,
-#         "index_list": [x for x in range(len(prices)**MEMORY_VOLUME)],
-#         "action_list": prices,
-#         "delta": e1["delta"],
-#         "alpha": 0.15,
-#         "mode": "zhou", # None, "sanchez_cartas", "zhou"
-#     },
-# }
 ##########################
 ### TN_DDQN
 ##########################
@@ -191,28 +169,28 @@ ONLY_OWN = False
 ##########################
 ### PPO-D
 ##########################
-assert mode == "D"
-e4 = {
-    "prices": prices,
-    "inventory": inventory,
-    "firm_model": PPO_D,
-    "firm_params": {
-        "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
-        "inventory_actions": inventory,
-        "price_actions": prices,
-        "batch_size": 128,          # 32, 64, 100, 128
-        "N_epochs": 256,            # 100, 200, e1["T"]//100
-        "epochs": 10,               # 25
-        "gamma": e1["delta"],
-        "actor_lr": 1.5 * 1e-4,
-        "critic_lr": 1.5 * 1e-4,
-        "clip_eps": 0.2,
-        "lmbda": 1,
-        "cuda_usage": False,
-    },
-    "MEMORY_VOLUME": MEMORY_VOLUME,
-    "own": own,
-}
+# assert mode == "D"
+# e4 = {
+#     "prices": prices,
+#     "inventory": inventory,
+#     "firm_model": PPO_D,
+#     "firm_params": {
+#         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+#         "inventory_actions": inventory,
+#         "price_actions": prices,
+#         "batch_size": 128,          # 32, 64, 100, 128
+#         "N_epochs": 256,            # 100, 200, e1["T"]//100
+#         "epochs": 10,               # 25
+#         "gamma": e1["delta"],
+#         "actor_lr": 1.5 * 1e-4,
+#         "critic_lr": 1.5 * 1e-4,
+#         "clip_eps": 0.2,
+#         "lmbda": 1,
+#         "cuda_usage": False,
+#     },
+#     "MEMORY_VOLUME": MEMORY_VOLUME,
+#     "own": own,
+# }
 ##########################
 ### PPO-C
 ##########################
@@ -241,31 +219,31 @@ e4 = {
 ##########################
 ### SAC
 ##########################
-# assert mode == "C"
-# e4 = {
-#     "prices": prices,
-#     "inventory": inventory,
-#     "firm_model": SAC,
-#     "firm_params": {
-#         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
-#         "inventory_actions": inventory,
-#         "price_actions": prices,
-#         "batch_size": 100,         # 32, 64, 100, 128
-#         "N_epochs": 100,           # 100, 200, e1["T"]//100
-#         "epochs": 1,
-#         "MC_samples": 200,
-#         "gamma": e1["delta"],
-#         "actor_lr": 3e-4,
-#         "critic_lr": 3e-4,
-#         "alpha_lr": 3e-4,
-#         "target_entropy": -2,
-#         "target_scaling": 1,
-#         "tau": 0.05,
-#         "cuda_usage": False,
-#     },
-#     "MEMORY_VOLUME": MEMORY_VOLUME,
-#     "own": own,
-# }
+assert mode == "C"
+e4 = {
+    "prices": prices,
+    "inventory": inventory,
+    "firm_model": SAC,
+    "firm_params": {
+        "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+        "inventory_actions": inventory,
+        "price_actions": prices,
+        "batch_size": 100,         # 32, 64, 100, 128
+        "N_epochs": 100,           # 100, 200, e1["T"]//100
+        "epochs": 1,
+        "MC_samples": 200,
+        "gamma": e1["delta"],
+        "actor_lr": 3e-4,
+        "critic_lr": 3e-4,
+        "alpha_lr": 3e-4,
+        "target_entropy": -2,
+        "target_scaling": 1,
+        "tau": 0.05,
+        "cuda_usage": False,
+    },
+    "MEMORY_VOLUME": MEMORY_VOLUME,
+    "own": own,
+}
 ##########################
 ### No platform
 ##########################
@@ -278,55 +256,57 @@ e4 = {
 ##########################
 ### Fixed weights platform
 ##########################
-# e5 = {
-#     "folder_num": "1",
-#     "PLATFORM": True,
-#     "plat_model": fixed_weights,
-#     "plat_params":{
-#         "weight": 1/3,
-#         "memory_size": e1["m"],
-#         "n": e1["n"],
-#         "p_inf": e2["p_inf"],
-#         "p_max": e2["p_sup"],
-#         "C": e3["demand_params"]["C"],
-#     }
-# }
-##########################
-### Dynamic platform
-##########################
 e5 = {
-    "folder_num": "2",
+    "folder_num": "1",
     "PLATFORM": True,
-    "plat_model": dynamic_weights,
-    "plat_params": {
-        "state_dim": 0 * MEMORY_VOLUME * e1["n"] + 2 * MEMORY_VOLUME * (e1["n"] - 1),
-        "d_memory_size": e1["m"],
+    "plat_model": fixed_weights,
+    "plat_params":{
+        "weight": 1/3,
+        "memory_size": e1["m"],
         "n": e1["n"],
         "p_inf": e2["p_inf"],
         "p_max": e2["p_sup"],
         "C": e3["demand_params"]["C"],
-        "batch_size": 128,          # 32, 64, 100, 128
-        "N_epochs": 256,            # 100, 200, e1["T"]//100
-        "epochs": 10,               # 25
-        "gamma": e1["delta"],
-        "actor_lr": 1.5 * 1e-4,
-        "critic_lr": 1.5 * 1e-4,
-        "clip_eps": 0.2,
-        "lmbda": 1,
-        "cuda_usage": False,
-        },
+    }
 }
+##########################
+### Dynamic platform
+##########################
+# e5 = {
+#     "folder_num": "2",
+#     "PLATFORM": True,
+#     "plat_model": dynamic_weights,
+#     "plat_params": {
+#         "state_dim": 2 * MEMORY_VOLUME * e1["n"] + 2 * MEMORY_VOLUME * (e1["n"] - 1),
+#         "d_memory_size": e1["m"],
+#         "alpha_actions": np.linspace(0, 1, max(e2["arms_amo_price"], e2["arms_amo_inv"])),
+#         "n": e1["n"],
+#         "p_inf": e2["p_inf"],
+#         "p_max": e2["p_sup"],
+#         "C": e3["demand_params"]["C"],
+#         "batch_size": 128,          # 32, 64, 100, 128
+#         "N_epochs": 256,            # 100, 200, e1["T"]//100
+#         "epochs": 10,               # 25
+#         "gamma": e1["delta"],
+#         "actor_lr": 1.5 * 1e-4,
+#         "critic_lr": 1.5 * 1e-4,
+#         "clip_eps": 0.2,
+#         "lmbda": 1,
+#         "cuda_usage": False,
+#         },
+# }
 
 Environment = e1 | e2 | e3 | e4 | e5
 
 # print(Environment)
 
-# GENERAL_RES = "PPO_C"
-# folder_name = f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_2_2/"
+# GENERAL_RES = "PPO_D"
+# folder_name = f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_2_4/"
 # a = np.load(folder_name + "one_weight_history.npy")
-# mv = np.convolve(expit(a), np.ones(int(0.05 * e1["T"])) / int(0.05 * e1["T"]), mode='valid')
+# mv = np.convolve(a, np.ones(int(0.05 * e1["T"])) / int(0.05 * e1["T"]), mode='valid')
 # plt.plot(mv)
 # plt.show()
+# print(a.tolist()[-20:])
 
 # Price_history = []
 # Profit_history = []
