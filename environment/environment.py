@@ -235,17 +235,26 @@ for env in range(ENV):
 
             doli = spros.distribution(p)
 
-            first, second, boosting = platform.suggest(p)
+            plat_info = {
+                "doli": doli,
+                "p": p,
+                "stock": np.array(x_t),
+                "inv": inv,
+            }
+            first, second, u_alpha, boosting = platform.suggest(plat_info)
             pi, pi_plat = profit_func(gamma, p, theta_d, doli, c_i, inv, np.array(x_t), h_plus, v_minus, C, boosting)
             plat_info = {
-                    "boosting": boosting,
-                    "doli": doli,
-                    "price_val": first,
-                    "inv_val": second,
-                    'current_inventory': inv,
-                    "competitors_prices": p,
-                    "plat_pi": pi_plat,
-                }
+                "doli": doli,
+                "p": p,
+                "boosting": boosting,
+                "first": first,
+                "second": second,
+                "stock": np.array(x_t),
+                "inv": inv,
+                "action": u_alpha,
+                "plat_pi": pi_plat,
+            }
+            demand = doli * boosting
             platform.cache_data(plat_info)
 
             if len(learn) == MEMORY_VOLUME:
@@ -266,22 +275,25 @@ for env in range(ENV):
                     }
 
                     new_state = {
-                        'current_inventory': max(0, inv[i] - doli[i]),
+                        'current_inventory': max(0, inv[i] - demand[i]),
                         'competitors_prices': new,
                     }
 
                     firms[i].cache_experience(prev_state, idxs[i], pi[i], new_state)
                     
-            x_t = np.maximum(0, inv - doli)
+            x_t = np.maximum(0, inv - demand)
 
             for i in range(n):
                 firms[i].update()
-            
+            platform.update()
+
             mem = learn.copy()
 
             raw_profit_history.append(pi)
             raw_price_history.append(p)
             raw_stock_history.append(inv)
+            if DIFF_PL:
+                raw_platform_history.append((pi_plat, u_alpha/10))
 
     elif str(firms[0]) == "PPO_D":
         total_t = -MEMORY_VOLUME
@@ -330,44 +342,28 @@ for env in range(ENV):
 
                     doli = spros.distribution(p)
 
-                    first, second, boosting = platform.suggest(p)
+                    plat_info = {
+                        "doli": doli,
+                        "p": p,
+                        "stock": np.array(x_t),
+                        "inv": inv,
+                    }
+                    first, second, u_alpha, boosting = platform.suggest(plat_info)
                     pi, pi_plat = profit_func(gamma, p, theta_d, doli, c_i, inv, np.array(x_t), h_plus, v_minus, C, boosting)
                     plat_info = {
-                            "boosting": boosting,
-                            "doli": doli,
-                            "price_val": first,
-                            "inv_val": second,
-                            'current_inventory': inv,
-                            "competitors_prices": p,
-                            "plat_pi": pi_plat,
-                        }
+                        "doli": doli,
+                        "p": p,
+                        "boosting": boosting,
+                        "first": first,
+                        "second": second,
+                        "stock": np.array(x_t),
+                        "inv": inv,
+                        "action": u_alpha,
+                        "plat_pi": pi_plat,
+                    }
+                    demand = doli * boosting
                     platform.cache_data(plat_info)
                     
-                    # ### БЫЛО
-                    # if len(learn) == MEMORY_VOLUME:
-                    #     for i in range(n):
-                    #         state_i = mem.copy()
-                    #         if len(state_i) == MEMORY_VOLUME and not(own):
-                    #             for j in range(MEMORY_VOLUME):
-                    #                 state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
-                            
-                    #         new = learn.copy()
-                    #         if len(new) == MEMORY_VOLUME and not(own):
-                    #             for j in range(MEMORY_VOLUME):
-                    #                 new[j] = new[j][: i] + new[j][i + 1 :]
-                            
-                    #         prev_state = {
-                    #             'current_inventory': x_t[i],
-                    #             'competitors_prices': state_i,
-                    #         }
-
-                    #         new_state = {
-                    #             'current_inventory': max(0, inv[i] - doli[i]),
-                    #             'competitors_prices': new,
-                    #         }
-
-                    #         firms[i].cache_experience(prev_state, idxs[i], pi[i], new_state)
-
                     if len(learn) == MEMORY_VOLUME:
                         for i in range(n):
                             new = learn.copy()
@@ -376,13 +372,13 @@ for env in range(ENV):
                                     new[j] = new[j][: i] + new[j][i + 1 :]
 
                             new_state = {
-                                'current_inventory': max(0, inv[i] - doli[i]),
+                                'current_inventory': max(0, inv[i] - demand[i]),
                                 'competitors_prices': new,
                             }
 
                             firms[i].cache_experience(new_state, idxs[i], pi[i])
                             
-                    x_t = np.maximum(0, inv - doli)
+                    x_t = np.maximum(0, inv - demand)
                     
                     mem = learn.copy()
 
@@ -390,19 +386,21 @@ for env in range(ENV):
                     raw_profit_history.append(pi)
                     raw_price_history.append(p)
                     raw_stock_history.append(inv)
+                    if DIFF_PL:
+                        raw_platform_history.append((pi_plat, u_alpha/10))
                 
                 if total_t < 0:
                     total_t = 0
                 elif min(total_t + N_epochs, T) < T:
                     for i in range(n):
-                        firms[i].update()   
+                        firms[i].update()
+                    platform.update()
                     total_t = min(total_t + N_epochs, T)
                 else:
                     total_t = min(total_t + N_epochs, T)
                 
     elif str(firms[0]) == "PPO_C":
         total_t = -MEMORY_VOLUME
-        # count_plat = 0
         with tqdm(total = T + MEMORY_VOLUME, desc=f'Раунд {env + 1}') as pbar:
             while total_t < T:
                 if total_t < 0:
@@ -453,41 +451,6 @@ for env in range(ENV):
 
                     doli = spros.distribution(p)
 
-                    # if not PLATFORM:
-                    #     pi = ((1 - gamma) * p - theta_d) * doli
-                    #     pi -= c_i * (inv - np.array(x_t))
-                    #     pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
-                    #     # print(pi)
-                    # else:
-                    #     # boosting = platform.suggest(p)
-                    #     # demand = doli * boosting.detach().numpy()
-                    #     # pi = ((1 - gamma) * p - theta_d) * demand
-                    #     # pi -= c_i * (inv - np.array(x_t))
-                    #     # pi += -h_plus * np.maximum(0, inv - demand) + v_minus * np.minimum(0, inv - demand)
-                    #     first, second, boosting = platform.suggest(p)
-                    #     demand = doli * boosting
-                    #     pi = ((1 - gamma) * p - theta_d) * demand
-                    #     pi -= c_i * (inv - np.array(x_t))
-                    #     pi += -h_plus * np.maximum(0, inv - demand) + v_minus * np.minimum(0, inv - demand)
-                    #     # if t == max_t - 1:
-                    #     pi_plat = (gamma * p + theta_d) * demand
-                    #     pi_plat += (h_plus * np.maximum(0, inv - demand) - v_minus * np.minimum(0, inv - demand))/C
-                    #     pi_plat = np.sum(pi_plat)
-                    #     # print("True", pi)
-                    #     # print("True P", pi_plat)
-                    #     plat_info = {
-                    #         "boosting": boosting,
-                    #         "doli": doli,
-                    #         "demand": demand,
-                    #         "price_val": first,
-                    #         "inv_val": second,
-                    #         'current_inventory': inv,
-                    #         "competitors_prices": p,
-                    #         "plat_pi": pi_plat,
-                    #         "timestamp": max_t - 1 - t,
-                    #     }
-                    #     # platform.cache_data(plat_info)
-                    
                     plat_info = {
                         "doli": doli,
                         "p": p,
@@ -507,38 +470,9 @@ for env in range(ENV):
                         "action": u_alpha,
                         "plat_pi": pi_plat,
                     }
-                    # print("Other", pi)
-                    # print("Other P", pi_plat)
-                    # if t == 124:
-                    #     a += 1
+                    demand = doli * boosting
                     platform.cache_data(plat_info)
-
-                    ### БЫЛО:
-                    # if len(learn) == MEMORY_VOLUME:
-                    #     for i in range(n):
-                    #         state_i = mem.copy()
-                    #         if len(state_i) == MEMORY_VOLUME and not(own):
-                    #             for j in range(MEMORY_VOLUME):
-                    #                 state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
-                            
-                    #         new = learn.copy()
-                    #         if len(new) == MEMORY_VOLUME and not(own):
-                    #             for j in range(MEMORY_VOLUME):
-                    #                 new[j] = new[j][: i] + new[j][i + 1 :]
-                            
-                    #         prev_state = {
-                    #             'current_inventory': x_t[i],
-                    #             'competitors_prices': state_i,
-                    #         }
-
-                    #         new_state = {
-                    #             'current_inventory': max(0, inv[i] - doli[i]),
-                    #             'competitors_prices': new,
-                    #         }
-
-                    #         firms[i].cache_experience(prev_state, iter_probs[i], pi[i], new_state)
-                        
-                    ### СТАЛО:
+                    
                     if len(learn) == MEMORY_VOLUME:
                         for i in range(n):
                             new = learn.copy()
@@ -547,13 +481,13 @@ for env in range(ENV):
                                     new[j] = new[j][: i] + new[j][i + 1 :]
 
                             new_state = {
-                                'current_inventory': max(0, inv[i] - doli[i]),
+                                'current_inventory': max(0, inv[i] - demand[i]),
                                 'competitors_prices': new,
                             }
 
                             firms[i].cache_experience(new_state, iter_probs[i], pi[i])
 
-                    x_t = np.maximum(0, inv - doli)
+                    x_t = np.maximum(0, inv - demand)
                     
                     mem = learn.copy()
 
@@ -562,15 +496,14 @@ for env in range(ENV):
                     raw_price_history.append(p)
                     raw_stock_history.append(inv)
                     if DIFF_PL:
-                        raw_platform_history.append(pi_plat)
+                        raw_platform_history.append((pi_plat, u_alpha/10))
                 
                 if total_t < 0:
                     total_t = 0
                 elif min(total_t + N_epochs, T) < T:
                     for i in range(n):
                         firms[i].update()
-                    # count_plat += 1
-                    # if PLATFORM and count_plat %2 == 0:
+
                     platform.update()
                     total_t = min(total_t + N_epochs, T)
                 else:
@@ -631,53 +564,27 @@ for env in range(ENV):
 
                     doli = spros.distribution(p)
 
-                    # if not PLATFORM:
-                    #     pi = ((1 - gamma) * p - theta_d) * doli
-                    #     pi -= c_i * (inv - np.array(x_t))
-                    #     pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
-                    # else:
-                    #     boosting = platform.suggest(p)
-                    #     pi = ((1 - gamma) * p - theta_d) * doli * boosting
-                    #     pi -= c_i * (inv - np.array(x_t))
-                    #     pi += -h_plus * np.maximum(0, inv - doli * boosting) + v_minus * np.minimum(0, inv - doli * boosting)
-                    #     platform.cache_data(doli * boosting)
-                    
-                    first, second, boosting = platform.suggest(p)
+                    plat_info = {
+                        "doli": doli,
+                        "p": p,
+                        "stock": np.array(x_t),
+                        "inv": inv,
+                    }
+                    first, second, u_alpha, boosting = platform.suggest(plat_info)
                     pi, pi_plat = profit_func(gamma, p, theta_d, doli, c_i, inv, np.array(x_t), h_plus, v_minus, C, boosting)
                     plat_info = {
-                            "boosting": boosting,
-                            "doli": doli,
-                            "price_val": first,
-                            "inv_val": second,
-                            'current_inventory': inv,
-                            "competitors_prices": p,
-                            "plat_pi": pi_plat,
-                        }
+                        "doli": doli,
+                        "p": p,
+                        "boosting": boosting,
+                        "first": first,
+                        "second": second,
+                        "stock": np.array(x_t),
+                        "inv": inv,
+                        "action": u_alpha,
+                        "plat_pi": pi_plat,
+                    }
+                    demand = doli * boosting
                     platform.cache_data(plat_info)
-
-                    # if len(learn) == MEMORY_VOLUME:
-                    #     for i in range(n):
-                    #         state_i = mem.copy()
-                    #         if len(state_i) == MEMORY_VOLUME and not(own):
-                    #             for j in range(MEMORY_VOLUME):
-                    #                 state_i[j] = state_i[j][: i] + state_i[j][i + 1 :]
-                            
-                    #         new = learn.copy()
-                    #         if len(new) == MEMORY_VOLUME and not(own):
-                    #             for j in range(MEMORY_VOLUME):
-                    #                 new[j] = new[j][: i] + new[j][i + 1 :]
-                            
-                    #         prev_state = {
-                    #             'current_inventory': x_t[i],
-                    #             'competitors_prices': state_i,
-                    #         }
-
-                    #         new_state = {
-                    #             'current_inventory': max(0, inv[i] - doli[i]),
-                    #             'competitors_prices': new,
-                    #         }
-                            
-                    #         firms[i].cache_experience(prev_state, iter_probs[i], pi[i], new_state)
 
                     if len(learn) == MEMORY_VOLUME:
                         for i in range(n):
@@ -687,13 +594,13 @@ for env in range(ENV):
                                     new[j] = new[j][: i] + new[j][i + 1 :]
 
                             new_state = {
-                                'current_inventory': max(0, inv[i] - doli[i]),
+                                'current_inventory': max(0, inv[i] - demand[i]),
                                 'competitors_prices': new,
                             }
 
                             firms[i].cache_experience(new_state, iter_probs[i], pi[i])
                     
-                    x_t = np.maximum(0, inv - doli)
+                    x_t = np.maximum(0, inv - demand)
                     
                     mem = learn.copy()
 
@@ -701,14 +608,16 @@ for env in range(ENV):
                     raw_profit_history.append(pi)
                     raw_price_history.append(p)
                     raw_stock_history.append(inv)
+                    if DIFF_PL:
+                        raw_platform_history.append((pi_plat, u_alpha/10))
                 
                 if total_t < 0:
                     total_t = 0
                 elif min(total_t + N_epochs, T) < T:
-                    # print("#"*50)
                     for i in range(n):
-                        # print("Обновление фирмы", i)
-                        firms[i].update()   
+                        firms[i].update()
+
+                    platform.update()
                     total_t = min(total_t + N_epochs, T)
                 else:
                     total_t = min(total_t + N_epochs, T)
@@ -728,7 +637,7 @@ for env in range(ENV):
         Stock_history.append(tuple([np.mean(raw_stock_history[-int(T/20):, i]) for i in range(n)]))
         print(Stock_history[-1])
     if DIFF_PL:
-        Platform_history.append(np.mean(raw_platform_history[-int(T/20):]))
+        Platform_history.append(np.mean(raw_platform_history[-int(T/20):, 0]))
         print(Platform_history[-1])
     if SHOW_PROM_RES:
         print(Profit_history[-1])
@@ -859,7 +768,7 @@ if VISUALIZE or SAVE:
                 smoothed_pi -= c_i * (all_inv - stocks)
                 smoothed_pi += - h_plus * np.maximum(0, all_inv - all_d) + v_minus * np.minimum(0, all_inv - all_d)
             else:
-                mv = np.convolve(raw_platform_history, kernel, mode='valid')
+                mv = np.convolve(raw_platform_history[:, 0], kernel, mode='valid')
                 smoothed_pi = deepcopy(mv)
             
         if not DIFF_PL:
@@ -988,6 +897,11 @@ if SAVE_SUMMARY or VISUALIZE:
         if HAS_INV == 1:
             path = os.path.join(res_name, "Stock_history.npy")
             np.save(path, Stock_history)
+        if DIFF_PL:
+            path = os.path.join(res_name, "Platform_history.npy")
+            np.save(path, Platform_history)
+            path = os.path.join(res_name, "one_weight_history.npy")
+            np.save(path, raw_platform_history[:, 1])
 
         with open(res_name + "summary.txt", "w+", encoding="utf-8") as f:
             A = ""

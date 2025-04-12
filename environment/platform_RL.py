@@ -33,7 +33,7 @@ class no_platform:
     
 
     def suggest(self, p):
-        return (0, 0, 0, 0)
+        return (0, 0, 0, 1)
 
 
     def update(self):
@@ -112,6 +112,7 @@ class PPO_C_ActorNet(nn.Module):
         sloy = 256 # 256
         
         self.c_actor_net = nn.Sequential(
+            # nn.LayerNorm(input_dim),
             nn.Linear(input_dim, sloy),
             nn.LayerNorm(sloy),
             nn.ReLU(),
@@ -127,8 +128,14 @@ class PPO_C_ActorNet(nn.Module):
     def forward(self, x):
         y = self.c_actor_net(x)
         alpha_mu, alpha_sigma = self.alpha_head_mu(y), self.alpha_head_sigma(y)
-        assert not torch.isnan(alpha_mu).any(), "alpha_mu is NaN"
-        alpha_sigma = torch.pow(1 + torch.pow(alpha_sigma, 2), 0.5) - 1
+        # assert not torch.isnan(alpha_mu).any(), "alpha_mu is NaN"
+        if torch.isnan(alpha_mu).any():
+            print(x)
+            print(y)
+            print(alpha_mu, alpha_sigma)
+            print("alpha_mu is NaN")
+        # alpha_sigma = torch.pow(1 + torch.pow(alpha_sigma, 2), 0.5) - 1
+        alpha_sigma = torch.sqrt(1 + torch.pow(alpha_sigma, 2)) - 1
         alpha_sigma = alpha_sigma.clamp(min = 0.01)
         return (alpha_mu, alpha_sigma)
 
@@ -140,6 +147,7 @@ class PPO_C_CriticNet(nn.Module):
         sloy = 256 # 256
         
         self.c_critic_net = nn.Sequential(
+            # nn.LayerNorm(input_dim),
             nn.Linear(input_dim, sloy),
             nn.LayerNorm(sloy),
             nn.ReLU(),
@@ -216,11 +224,11 @@ class dynamic_weights:
 
     def _get_state_vector(self, plat_state):
         
-        first = plat_state['first']
-        second = plat_state['second']
-        stock = plat_state['stock']
-        inv = plat_state['inv']
-        return torch.tensor(inv.tolist() + stock.tolist() + first.tolist() + second.tolist(), dtype=self.dtype, device=self.device)
+        first = plat_state['first'][:-1]
+        second = plat_state['second'][:-1]
+        # stock = plat_state['stock'] / self.C
+        # inv = plat_state['inv'] / self.C
+        return torch.tensor(first.tolist() + second.tolist(), dtype=self.dtype, device=self.device) # inv.tolist() + stock.tolist() + 
 
 
     def suggest(self, plat_state):
@@ -237,7 +245,7 @@ class dynamic_weights:
         alpha_mu, alpha_sigma = self.c_actor_net(state)
         
         u_alpha = torch.distributions.Normal(alpha_mu, alpha_sigma).sample()
-        weight = torch.sigmoid(u_alpha/10).item()
+        weight = torch.sigmoid(u_alpha/10).clamp(1e-4, 1-1e-4).item()
         u_alpha = u_alpha.item()
 
         res = weight * first + (1 - weight) * second
@@ -287,18 +295,26 @@ class dynamic_weights:
             all_states = torch.stack([x[0] for x in self.memory])
             all_actions = torch.tensor([x[1] for x in self.memory])[1:]
             all_rewards = torch.tensor([x[2] for x in self.memory], dtype = self.dtype).view(-1, 1)[1:]
-            all_next_states = all_states[1:]
-            all_states = all_states[:-1]
+            # all_next_states = all_states[1:]
+            # all_states = all_states[:-1]
         else:
             all_states = torch.stack([x[0] for x in self.memory]).to(self.device)
             all_actions = torch.stack([x[1] for x in self.memory]).to(self.device)[1:]
             all_rewards = torch.stack([x[2] for x in self.memory], dim = 1)[0].view(-1, 1).to(self.device)[1:]
-            all_next_states = all_states[1:]
-            all_states = all_states[:-1]
+            # all_next_states = all_states[1:]
+            # all_states = all_states[:-1]
         
-        td_target = all_rewards + self.gamma * self.c_critic_net(all_next_states)
-        td_delta = td_target - self.c_critic_net(all_states)
+        # print(all_next_states[:5])
+        # print(self.c_critic_net(all_next_states[:5]))
+        # print(all_rewards[:5])
+        prom = self.c_critic_net(all_states)
+        td_target = all_rewards + self.gamma * prom[1:]
+        td_delta = td_target - prom[:-1]
+        # all_next_states = all_states[1:]
+        all_states = all_states[:-1]
         advantage = compute_advantage(self.gamma, self.lmbda, td_delta.cpu()).to(self.device)
+        # print(advantage[:5])
+        # a += 1
 
         with torch.no_grad():
             alpha_mu, alpha_sigma = self.c_actor_net(all_states)
@@ -332,3 +348,4 @@ class dynamic_weights:
             self.critic_optimizer.step()
         
         self.memory = [self.memory[-1]]
+

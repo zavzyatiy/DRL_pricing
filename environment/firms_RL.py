@@ -1000,17 +1000,20 @@ class PPO_C:
             all_states = torch.stack([x[0] for x in self.memory])
             all_actions = torch.tensor([x[1] for x in self.memory])[1:]
             all_rewards = torch.tensor([x[2] for x in self.memory], dtype = self.dtype).view(-1, 1)[1:]
-            all_next_states = all_states[1:]
-            all_states = all_states[:-1]
+            # all_next_states = all_states[1:]
+            # all_states = all_states[:-1]
         else:
             all_states = torch.stack([x[0] for x in self.memory]).to(self.device)
             all_actions = torch.stack([x[1] for x in self.memory]).to(self.device)[1:]
             all_rewards = torch.stack([x[2] for x in self.memory], dim = 1)[0].view(-1, 1).to(self.device)[1:]
-            all_next_states = all_states[1:]
-            all_states = all_states[:-1]
+            # all_next_states = all_states[1:]
+            # all_states = all_states[:-1]
         
-        td_target = all_rewards + self.gamma * self.c_critic_net(all_next_states)
-        td_delta = td_target - self.c_critic_net(all_states)
+        prom = self.c_critic_net(all_states)
+        td_target = all_rewards + self.gamma * prom[:-1]
+        td_delta = td_target - prom[1:]
+        # all_next_states = all_states[1:]
+        all_states = all_states[:-1]
         advantage = compute_advantage(self.gamma, self.lmbda, td_delta.cpu()).to(self.device)
 
         with torch.no_grad():
