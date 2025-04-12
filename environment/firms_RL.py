@@ -203,6 +203,94 @@ class TQL:
             self.Q_mat = Q
 
 
+if False:
+    print("Здесь архив")
+    # if str(firms[0]) == "epsilon_greedy":
+    #     for t in tqdm(range(T)):
+
+    #         ### действие
+    #         idx = []
+    #         p = []
+    #         for f in firms:
+    #             idx_i = f.suggest()
+    #             idx.append(idx_i)
+    #             p.append(prices[idx_i])
+
+    #         ### подсчет спроса
+    #         doli = spros.distribution(p)
+
+    #         ### подсчет прибыли фирм
+    #         pi = []
+    #         for i in range(n):
+    #             pi_i = (p[i] - c_i) * doli[i]
+    #             pi.append(pi_i)
+
+    #         raw_profit_history.append(pi)
+
+    #         ### обновление весов алгоритмов
+    #         for i in range(n):
+    #             f = firms[i]
+    #             f.update(idx[i], pi[i])
+    #             firms[i] = f
+
+    #         raw_price_history.append(p)
+    
+    # elif str(firms[0]) == "TQL":
+    #     for t in tqdm(range(-MEMORY_VOLUME, T), f"Раунд {env + 1}"):
+    #         idx = []
+    #         for i in range(n):
+    #             idx_i = firms[i].suggest()
+    #             idx.append(idx_i)
+
+    #         learn = mem.copy()
+    #         if t < 0:
+    #             learn.append(idx)
+    #         else:
+    #             learn = learn[1:] + [idx]
+
+    #         p = []
+    #         for i in range(n):
+    #             p.append(prices[idx[i]])
+
+    #         doli = spros.distribution(p)
+
+    #         pi = []
+    #         for i in range(n):
+    #             pi_i = (p[i] - c_i) * doli[i]
+    #             pi.append(pi_i)
+
+    #         for i in range(n):
+    #             f = firms[i]
+    #             x = learn.copy()
+    #             if len(learn) == MEMORY_VOLUME and not(own) and not(ONLY_OWN):
+    #                 for j in range(MEMORY_VOLUME):
+    #                     x[j] = x[j][: i] + x[j][i + 1 :]
+    #             elif len(learn) == MEMORY_VOLUME and ONLY_OWN:
+    #                 for j in range(MEMORY_VOLUME):
+    #                     x[j] = [x[j][i]]
+
+    #             f.update(idx[i], x, pi[i])
+    #             firms[i] = f
+
+    #         for i in range(n):
+    #             f = firms[i]
+    #             x = learn.copy()
+    #             if len(learn) == MEMORY_VOLUME and not(own) and not(ONLY_OWN):
+    #                 for j in range(MEMORY_VOLUME):
+    #                     x[j] = x[j][: i] + x[j][i + 1 :]
+    #             elif len(learn) == MEMORY_VOLUME and ONLY_OWN:
+    #                 for j in range(MEMORY_VOLUME):
+    #                     x[j] = [x[j][i]]
+                    
+    #             f.adjust_memory(x)
+    #             firms[i] = f
+            
+    #         mem = learn.copy()
+
+    #         raw_profit_history.append(pi)
+    #         raw_price_history.append(p)
+
+
 class DQNet(nn.Module):
     """
     mini cnn structure
@@ -816,14 +904,14 @@ class PPO_C:
 
     def _get_state_vector(self, firm_state):
         """Преобразует состояние фирмы в тензор"""
-        if not self.cuda_usage:
-            inventory = firm_state['current_inventory']
-            comp_prices = np.array(firm_state['competitors_prices']).flatten()
-            return torch.tensor([inventory] + comp_prices.tolist(), dtype=self.dtype, device=self.device)
-        else:
-            inventory = firm_state['current_inventory']
-            comp_prices = np.array(firm_state['competitors_prices']).flatten()
-            return torch.tensor([inventory] + comp_prices.tolist(), dtype=self.dtype, device=self.device)
+        # if not self.cuda_usage:
+        #     inventory = firm_state['current_inventory']
+        #     comp_prices = np.array(firm_state['competitors_prices']).flatten()
+        #     return torch.tensor([inventory] + comp_prices.tolist(), dtype=self.dtype, device=self.device)
+        # else:
+        inventory = firm_state['current_inventory']
+        comp_prices = np.array(firm_state['competitors_prices']).flatten()
+        return torch.tensor([inventory] + comp_prices.tolist(), dtype=self.dtype, device=self.device)
 
 
     def suggest_actions(self, firm_state):

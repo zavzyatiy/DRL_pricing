@@ -10,7 +10,6 @@ import torch.nn as nn
 import torch
 from torch.distributions.categorical import Categorical
 import torch.nn.functional as F
-from scipy.special import expit
 import random
 from copy import deepcopy
 
@@ -18,6 +17,27 @@ RANDOM_SEED = 42
 random.seed(RANDOM_SEED)
 np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
+
+
+class no_platform:
+    def __init__(smthing):
+        pass
+
+
+    def __repr__(self):
+        return "None"
+
+
+    def cache_data(self, state):
+        pass
+    
+
+    def suggest(self, p):
+        return (0, 0, 0, 0)
+
+
+    def update(self):
+        pass
 
 
 class fixed_weights:
@@ -31,10 +51,7 @@ class fixed_weights:
             C: float,
 			):
         
-        # weights = np.array(weights)
-        # assert np.sum(weights) == 1
-
-        self.weight = torch.tensor(weight)
+        self.weight = weight
         self.memory_size = memory_size
         self.p = p_max
         self.diff = p_max - p_inf
@@ -53,176 +70,265 @@ class fixed_weights:
         if len(self.memory) >= self.memory_size:
             self.memory.pop(0)
 
-        self.memory.append(state["demand"])
-    
-
-    def suggest(self, p):
-        first = (self.p - p)/self.diff
-        if len(self.memory) > 0:
-            second = np.mean(np.array(self.memory).T, axis = 1) / self.C
-        else:
-            second = np.ones(self.n)
-        # res = self.weights[0] * first + self.weights[1] * second
-        # e_res = np.exp(res)
-        # return self.n * e_res/np.sum(e_res)
-        w = self.weight
-        res = w * torch.tensor(first.tolist()) + (1 - w) * torch.tensor(second.tolist())
-        e_res = res.exp()
-        return self.n * e_res/(e_res).sum()
-
-
-    def update(self):
-        pass
-
-
-def calc_demand_grad(x, C, n, doli, boosting,
-                     price_val, inv_val, d_grad):
-    s_i_s_j = np.prod(boosting)/n
-    res = doli * s_i_s_j
-    recc = price_val[::-1] - price_val + inv_val - inv_val[::-1]
-    K = len(d_grad)
-    if K > 0:
-        recc += (1 - x)/(C * K) * np.sum(d_grad.T[::-1] - d_grad.T, axis = 1)
-    return res * recc
-
-
-class dynamic_weights:
-    def __init__(
-            self,
-            demand_memory_size: int,
-            n: int,
-            p_inf: float,
-            p_max: float,
-            C: float,
-            starting_weight: float,
-            delta: float,
-            lr: float,
-            # cuda_usage: bool,
-            gamma: float,
-            theta_d: float,
-            h_plus: float,
-            v_minus: float,
-			):
-
-        self.weight = starting_weight
-        self.demand_memory_size = demand_memory_size
-        self.p = p_max
-        self.diff = p_max - p_inf
-        self.n = n
-        assert n == 2, "Right now dynamic platform is built only for 2 players"
-        self.C = C
-
-        self.delta = delta
-        self.lr = lr
-        self.gamma = gamma
-        self.theta_d = theta_d
-        self.h_plus = h_plus
-        self.v_minus = v_minus
-
-        self.memory = []
-        self.d_grad = []
-        self.res = 0
-        self.profit_grad = 0 # torch.tensor(0.0)
-
-
-    def __repr__(self):
-        return "dynamic_weights"
-
-
-    def cache_data(self, state):
-        
-        # t = state["timestamp"]
-        # if t < self.demand_memory_size and t >= 0:
-        #     # print(t)
-        #     inv = torch.tensor(state['current_inventory'].tolist())
-        #     # prom_memory = [x.clone() for x in self.memory]
-        #     # print(self.memory)
-        #     boosting = state["boosting"]
-        #     demand = torch.tensor(state["demand"])
-        #     p = state["competitors_prices"]
-        #     res = torch.tensor((self.gamma * p + self.theta_d)) * demand * boosting
-        #     res += (self.h_plus * torch.maximum(torch.tensor(0.0), inv - demand))/self.C
-        #     res -= (self.v_minus * torch.minimum(torch.tensor(0.0), inv - demand))/self.C
-        #     res = self.delta**t * res.sum()
-        #     # res = res.sum()
-        #     self.res += res.item()
-        #     res.backward()
-        #     self.profit_grad += self.weight.grad
-        #     # self.memory = [x.clone() for x in prom_memory]
-
-        t = state["timestamp"]
-        doli = state["doli"]
-        boosting = state["boosting"]
-        demand = state["demand"]
-        price_val = state["price_val"]
-        inv_val = state["inv_val"]
-        d_grad = calc_demand_grad(expit(self.weight), self.C, self.n, doli,
-                                  boosting, price_val, inv_val, np.array(self.d_grad))
-        
-        if 0 <= t < self.demand_memory_size:
-            p = state["competitors_prices"]
-            inv = state["current_inventory"]
-            # print(d_grad)
-            # a += 1
-            pi_grad = (self.gamma * p + self.theta_d) * d_grad
-            pi_grad = np.sum(pi_grad)
-            signs = (np.sign(np.sign(inv - demand) + 0.1) + 1)/2
-            signs = (-self.h_plus - self.v_minus) * signs + self.v_minus
-            pi_grad += np.sum(signs/self.C * d_grad)
-            self.profit_grad += pi_grad * expit(self.weight) * expit(-self.weight)
-
-            # res = (self.gamma * p + self.theta_d) * demand
-            # res += (self.h_plus * np.maximum(0, inv - demand))/self.C
-            # res -= (self.v_minus * np.minimum(0, inv - demand))/self.C
-            res = self.delta**t * state["plat_pi"]
-            # res = res.sum()
-            self.res += res
-
+        demand = state["doli"] * state["boosting"]
         self.memory.append(demand)
-        self.d_grad.append(d_grad)
-
-        if len(self.memory) > self.demand_memory_size:
-            self.memory.pop(0)
-            self.d_grad.pop(0)
     
 
-    def suggest(self, p):
+    def suggest(self, plat_info):
+        p = plat_info["p"]
         first = (self.p - p)/self.diff
         if len(self.memory) > 0:
             second = np.mean(np.array(self.memory).T, axis = 1) / self.C
-            # second = torch.stack(self.memory).T.mean(axis = 1) / self.C
         else:
             second = np.ones(self.n)
-            # second = torch.ones(self.n)
-        
-        res = expit(self.weight) * first + (1 - expit(self.weight)) * second
+        res = self.weight * first + (1 - self.weight) * second
         e_res = np.exp(res)
-        return (first, second, self.n * e_res/np.sum(e_res))
-    
-        # w = torch.sigmoid(self.weight)
+        return (0, 0, self.weight, self.n * e_res/np.sum(e_res))
+        # w = self.weight
         # res = w * torch.tensor(first.tolist()) + (1 - w) * torch.tensor(second.tolist())
         # e_res = res.exp()
         # return self.n * e_res/(e_res).sum()
 
 
     def update(self):
-        # if torch.abs(self.profit_grad) > 0.5:
-        #     prom = (self.weight + self.lr * self.profit_grad).item()
-        #     # print(type(prom), prom)
-        #     self.weight = torch.tensor(prom)
-        #     self.weight.requires_grad = True
-        # print(self.res, torch.sigmoid(self.weight), self.profit_grad.item())
-        # # print(self.profit_grad.item())
-        # self.res = 0
-        # self.profit_grad = torch.tensor(0.0)
+        pass
 
-        if np.abs(self.profit_grad) > 0.15:
-            # print(self.res, expit(self.weight), self.profit_grad)
-            self.weight = self.weight + self.lr * self.profit_grad/self.demand_memory_size
-            # self.d_grad = []
+
+def compute_advantage(gamma, lmbda, td_delta):
+        td_delta = td_delta.detach().numpy()
+        advantage_list = []
+        advantage = 0.0
+        for delta in td_delta[::-1]:
+            advantage = gamma * lmbda * advantage + delta
+            advantage_list.append(advantage)
+        advantage_list.reverse()
+        return torch.tensor(np.array(advantage_list), dtype=torch.float)
+
+
+class PPO_C_ActorNet(nn.Module):
+    def __init__(self, input_dim):
+        super().__init__()
         
-        # print(self.res, expit(self.weight), self.profit_grad)
-        self.res = 0
-        self.profit_grad = 0
+        sloy = 256 # 256
+        
+        self.c_actor_net = nn.Sequential(
+            nn.Linear(input_dim, sloy),
+            nn.LayerNorm(sloy),
+            nn.ReLU(),
+            nn.Linear(sloy, sloy),
+            nn.LayerNorm(sloy),
+            nn.ReLU(),
+        )
+
+        self.alpha_head_mu = nn.Linear(sloy, 1)
+        self.alpha_head_sigma = nn.Linear(sloy, 1)
+        
+
+    def forward(self, x):
+        y = self.c_actor_net(x)
+        alpha_mu, alpha_sigma = self.alpha_head_mu(y), self.alpha_head_sigma(y)
+        assert not torch.isnan(alpha_mu).any(), "alpha_mu is NaN"
+        alpha_sigma = torch.pow(1 + torch.pow(alpha_sigma, 2), 0.5) - 1
+        alpha_sigma = alpha_sigma.clamp(min = 0.01)
+        return (alpha_mu, alpha_sigma)
 
 
+class PPO_C_CriticNet(nn.Module):
+    def __init__(self, input_dim):
+        super().__init__()
+        
+        sloy = 256 # 256
+        
+        self.c_critic_net = nn.Sequential(
+            nn.Linear(input_dim, sloy),
+            nn.LayerNorm(sloy),
+            nn.ReLU(),
+            nn.Linear(sloy, sloy),
+            nn.LayerNorm(sloy),
+            nn.ReLU(),
+            nn.Linear(sloy, 1)
+            )
+
+
+    def forward(self, x):
+        return self.c_critic_net(x)
+
+
+class dynamic_weights:
+    def __init__(
+            self, 
+            state_dim: int,
+            d_memory_size: int,
+            n: int,
+            p_inf: float,
+            p_max: float,
+            C: float,
+            batch_size: int,
+            N_epochs: int,
+            gamma: float,
+            actor_lr: float,
+            critic_lr: float,
+            epochs: int,
+            clip_eps: float,
+            lmbda: float,
+            cuda_usage: bool,
+            dtype = torch.float32,
+            ):
+        
+        self.state_dim = state_dim
+        self.d_memory_size = d_memory_size
+        self.p = p_max
+        self.diff = p_max - p_inf
+        self.n = n
+        self.C = C
+        
+        self.d_memory = []
+        self.index_list = [i for i in range(N_epochs)]
+        self.cuda_usage = cuda_usage
+
+        if cuda_usage:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = torch.device("cpu")
+
+        self.dtype = dtype
+
+        # Actor and Critic networks
+        self.c_actor_net = PPO_C_ActorNet(state_dim).to(self.device)
+        self.c_critic_net = PPO_C_CriticNet(state_dim).to(self.device)
+        
+        # Hyperparameters
+        self.batch_size = batch_size
+        self.gamma = gamma
+        self.clip_eps = clip_eps
+        self.epochs = epochs
+        self.memory_size = N_epochs
+        self.lmbda = lmbda
+        self.memory = []
+        
+        self.actor_optimizer = torch.optim.Adam(self.c_actor_net.parameters(), lr=actor_lr)
+        self.critic_optimizer = torch.optim.Adam(self.c_critic_net.parameters(), lr=critic_lr)
+
+
+    def __repr__(self):
+        return "dynamic_weights"
+
+
+    def _get_state_vector(self, plat_state):
+        
+        first = plat_state['first']
+        second = plat_state['second']
+        stock = plat_state['stock']
+        inv = plat_state['inv']
+        return torch.tensor(inv.tolist() + stock.tolist() + first.tolist() + second.tolist(), dtype=self.dtype, device=self.device)
+
+
+    def suggest(self, plat_state):
+        p = plat_state["p"]
+        first = (self.p - p)/self.diff
+        if len(self.d_memory) > 0:
+            second = np.mean(np.array(self.d_memory).T, axis = 1) / self.C
+        else:
+            second = np.ones(self.n)
+
+        state = self._get_state_vector({"first": first, "second": second,
+                                        "stock": plat_state["stock"], "inv": plat_state["inv"]})
+        
+        alpha_mu, alpha_sigma = self.c_actor_net(state)
+        
+        u_alpha = torch.distributions.Normal(alpha_mu, alpha_sigma).sample()
+        weight = torch.sigmoid(u_alpha).item()
+        u_alpha = u_alpha.item()
+
+        res = weight * first + (1 - weight) * second
+        e_res = np.exp(res)
+        boosting = self.n * e_res/np.sum(e_res)
+
+        return (first, second, u_alpha, boosting)
+
+
+    def cache_data(self, state):
+        self.cache_experience(state)
+
+        if len(self.d_memory) >= self.d_memory_size:
+            self.d_memory.pop(0)
+
+        demand = state["doli"] * state["boosting"]
+        self.d_memory.append(demand)
+
+
+    def cache_experience(self, state):
+        """Сохраняет опыт в replay buffer"""
+        state_vec = self._get_state_vector(state)
+        actions = state["action"]
+        reward = state["plat_pi"]
+        
+        if len(state_vec) == self.state_dim:
+            if not self.cuda_usage:
+                self.memory.append((
+                    state_vec,
+                    actions,
+                    reward,
+                ))
+            else:
+                self.memory.append((
+                    state_vec.cpu(),
+                    torch.tensor([actions], dtype = self.dtype).to(self.device),
+                    torch.tensor([reward], dtype = self.dtype).to(self.device),
+                ))
+
+
+    def update(self):
+        """Обновление модели на основе данных в памяти"""
+        if len(self.memory) < self.batch_size:
+            return 0.0
+        
+        if not self.cuda_usage:
+            all_states = torch.stack([x[0] for x in self.memory])
+            all_actions = torch.tensor([x[1] for x in self.memory])[1:]
+            all_rewards = torch.tensor([x[2] for x in self.memory], dtype = self.dtype).view(-1, 1)[1:]
+            all_next_states = all_states[1:]
+            all_states = all_states[:-1]
+        else:
+            all_states = torch.stack([x[0] for x in self.memory]).to(self.device)
+            all_actions = torch.stack([x[1] for x in self.memory]).to(self.device)[1:]
+            all_rewards = torch.stack([x[2] for x in self.memory], dim = 1)[0].view(-1, 1).to(self.device)[1:]
+            all_next_states = all_states[1:]
+            all_states = all_states[:-1]
+        
+        td_target = all_rewards + self.gamma * self.c_critic_net(all_next_states)
+        td_delta = td_target - self.c_critic_net(all_states)
+        advantage = compute_advantage(self.gamma, self.lmbda, td_delta.cpu()).to(self.device)
+
+        with torch.no_grad():
+            alpha_mu, alpha_sigma = self.c_actor_net(all_states)
+            alpha_dist = torch.distributions.Normal(alpha_mu.detach(), alpha_sigma.detach())
+            old_alpha_ln_probs = alpha_dist.log_prob(all_actions).diagonal()
+
+        for _ in range(self.epochs):
+            batch = random.sample(self.index_list, self.batch_size)
+            states = all_states[batch]
+            actions = all_actions[batch]
+            local_advantage = advantage[batch]
+            
+            alpha_mu, alpha_sigma = self.c_actor_net(states)
+
+            alpha_dist = torch.distributions.Normal(alpha_mu, alpha_sigma)
+            alpha_ln_probs = alpha_dist.log_prob(actions).diagonal()
+            
+            ratio = alpha_ln_probs - old_alpha_ln_probs[batch]
+            ratio = torch.exp(ratio)
+            surr1 = ratio * local_advantage
+            surr2 = torch.clamp(ratio, 1 - self.clip_eps, 1 + self.clip_eps) * local_advantage
+            
+            actor_loss = -torch.mean(torch.min(surr1, surr2))
+            critic_loss = F.mse_loss(self.c_critic_net(states), td_target[batch].detach())
+
+            self.actor_optimizer.zero_grad()
+            self.critic_optimizer.zero_grad()
+            actor_loss.backward()
+            critic_loss.backward()
+            self.actor_optimizer.step()
+            self.critic_optimizer.step()
+        
+        self.memory = [self.memory[-1]]

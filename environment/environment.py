@@ -142,15 +142,38 @@ C = demand_params["C"]
 
 # Есть ли на рынке платформа?
 PLATFORM = Environment["PLATFORM"]
-if PLATFORM:
-    PL = Environment["plat_model"]
-    platform = PL(**Environment["plat_params"])
-    DIFF_PL = (str(platform) == "dynamic_weights")
-    if DIFF_PL:
-        Platform_history = []
-else:
-    platform = "None"
-    DIFF_PL = False
+# if PLATFORM:
+#     PL = Environment["plat_model"]
+#     platform = PL(**Environment["plat_params"])
+#     DIFF_PL = (str(platform) == "dynamic_weights")
+#     if DIFF_PL:
+#         Platform_history = []
+# else:
+#     platform = "None"
+#     DIFF_PL = False
+PL = Environment["plat_model"]
+platform = PL(**Environment["plat_params"])
+DIFF_PL = (str(platform) == "dynamic_weights")
+if DIFF_PL:
+    Platform_history = []
+
+def calc_profit_no_plat(gamma, p, theta_d, doli, c_i,
+                        inv, x_t, h_plus, v_minus, C, boosting):
+    pi = ((1 - gamma) * p - theta_d) * doli
+    pi -= c_i * (inv - x_t)
+    pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
+    return (pi, 0)
+
+def calc_profit_with_plat(gamma, p, theta_d, doli, c_i,
+                          inv, x_t, h_plus, v_minus, C, boosting):
+    demand = doli * boosting
+    pi = ((1 - gamma) * p - theta_d) * demand
+    pi -= c_i * (inv - x_t)
+    pi += -h_plus * np.maximum(0, inv - demand) + v_minus * np.minimum(0, inv - demand)
+    pi_plat = (gamma * p + theta_d) * demand
+    pi_plat += (h_plus * np.maximum(0, inv - demand) - v_minus * np.minimum(0, inv - demand))/C
+    pi_plat = np.sum(pi_plat)
+    return (pi, pi_plat)
 
 for env in range(ENV):
 
@@ -171,97 +194,17 @@ for env in range(ENV):
         x_t = np.array([0 for i in range(n)])
     
     ### Инициализация платформы
+    # if PLATFORM:
+    PL = Environment["plat_model"]
+    platform = PL(**Environment["plat_params"])
+    
     if PLATFORM:
-        PL = Environment["plat_model"]
-        platform = PL(**Environment["plat_params"])
+        profit_func = calc_profit_with_plat
+    else:
+        profit_func = calc_profit_no_plat
 
     ### Инициализация основного цикла
-    if str(firms[0]) == "epsilon_greedy":
-        for t in tqdm(range(T)):
-
-            ### действие
-            idx = []
-            p = []
-            for f in firms:
-                idx_i = f.suggest()
-                idx.append(idx_i)
-                p.append(prices[idx_i])
-
-            ### подсчет спроса
-            doli = spros.distribution(p)
-
-            ### подсчет прибыли фирм
-            pi = []
-            for i in range(n):
-                pi_i = (p[i] - c_i) * doli[i]
-                pi.append(pi_i)
-
-            raw_profit_history.append(pi)
-
-            ### обновление весов алгоритмов
-            for i in range(n):
-                f = firms[i]
-                f.update(idx[i], pi[i])
-                firms[i] = f
-
-            raw_price_history.append(p)
-    
-    elif str(firms[0]) == "TQL":
-        for t in tqdm(range(-MEMORY_VOLUME, T), f"Раунд {env + 1}"):
-            idx = []
-            for i in range(n):
-                idx_i = firms[i].suggest()
-                idx.append(idx_i)
-
-            learn = mem.copy()
-            if t < 0:
-                learn.append(idx)
-            else:
-                learn = learn[1:] + [idx]
-
-            p = []
-            for i in range(n):
-                p.append(prices[idx[i]])
-
-            doli = spros.distribution(p)
-
-            pi = []
-            for i in range(n):
-                pi_i = (p[i] - c_i) * doli[i]
-                pi.append(pi_i)
-
-            for i in range(n):
-                f = firms[i]
-                x = learn.copy()
-                if len(learn) == MEMORY_VOLUME and not(own) and not(ONLY_OWN):
-                    for j in range(MEMORY_VOLUME):
-                        x[j] = x[j][: i] + x[j][i + 1 :]
-                elif len(learn) == MEMORY_VOLUME and ONLY_OWN:
-                    for j in range(MEMORY_VOLUME):
-                        x[j] = [x[j][i]]
-
-                f.update(idx[i], x, pi[i])
-                firms[i] = f
-
-            for i in range(n):
-                f = firms[i]
-                x = learn.copy()
-                if len(learn) == MEMORY_VOLUME and not(own) and not(ONLY_OWN):
-                    for j in range(MEMORY_VOLUME):
-                        x[j] = x[j][: i] + x[j][i + 1 :]
-                elif len(learn) == MEMORY_VOLUME and ONLY_OWN:
-                    for j in range(MEMORY_VOLUME):
-                        x[j] = [x[j][i]]
-                    
-                f.adjust_memory(x)
-                firms[i] = f
-            
-            mem = learn.copy()
-
-            raw_profit_history.append(pi)
-            raw_price_history.append(p)
-    
-    elif str(firms[0]) == "TN_DDQN":
+    if str(firms[0]) == "TN_DDQN":
         for t in tqdm(range(- MEMORY_VOLUME - batch_size, T), f"Раунд {env + 1}"):
         # for t in range(- MEMORY_VOLUME - batch_size, T):
             idxs = []
@@ -292,16 +235,18 @@ for env in range(ENV):
 
             doli = spros.distribution(p)
 
-            if not PLATFORM:
-                pi = ((1 - gamma) * p - theta_d) * doli
-                pi -= c_i * (inv - np.array(x_t))
-                pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
-            else:
-                boosting = platform.suggest(p)
-                pi = ((1 - gamma) * p - theta_d) * doli * boosting
-                pi -= c_i * (inv - np.array(x_t))
-                pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
-                platform.cache_data(doli)
+            first, second, boosting = platform.suggest(p)
+            pi, pi_plat = profit_func(gamma, p, theta_d, doli, c_i, inv, np.array(x_t), h_plus, v_minus, C, boosting)
+            plat_info = {
+                    "boosting": boosting,
+                    "doli": doli,
+                    "price_val": first,
+                    "inv_val": second,
+                    'current_inventory': inv,
+                    "competitors_prices": p,
+                    "plat_pi": pi_plat,
+                }
+            platform.cache_data(plat_info)
 
             if len(learn) == MEMORY_VOLUME:
                 for i in range(n):
@@ -385,16 +330,18 @@ for env in range(ENV):
 
                     doli = spros.distribution(p)
 
-                    if not PLATFORM:
-                        pi = ((1 - gamma) * p - theta_d) * doli
-                        pi -= c_i * (inv - np.array(x_t))
-                        pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
-                    else:
-                        boosting = platform.suggest(p)
-                        pi = ((1 - gamma) * p - theta_d) * doli * boosting
-                        pi -= c_i * (inv - np.array(x_t))
-                        pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
-                        platform.cache_data(doli)
+                    first, second, boosting = platform.suggest(p)
+                    pi, pi_plat = profit_func(gamma, p, theta_d, doli, c_i, inv, np.array(x_t), h_plus, v_minus, C, boosting)
+                    plat_info = {
+                            "boosting": boosting,
+                            "doli": doli,
+                            "price_val": first,
+                            "inv_val": second,
+                            'current_inventory': inv,
+                            "competitors_prices": p,
+                            "plat_pi": pi_plat,
+                        }
+                    platform.cache_data(plat_info)
                     
                     # ### БЫЛО
                     # if len(learn) == MEMORY_VOLUME:
@@ -455,7 +402,7 @@ for env in range(ENV):
                 
     elif str(firms[0]) == "PPO_C":
         total_t = -MEMORY_VOLUME
-        count_plat = 0
+        # count_plat = 0
         with tqdm(total = T + MEMORY_VOLUME, desc=f'Раунд {env + 1}') as pbar:
             while total_t < T:
                 if total_t < 0:
@@ -506,39 +453,66 @@ for env in range(ENV):
 
                     doli = spros.distribution(p)
 
-                    if not PLATFORM:
-                        pi = ((1 - gamma) * p - theta_d) * doli
-                        pi -= c_i * (inv - np.array(x_t))
-                        pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
-                    else:
-                        # boosting = platform.suggest(p)
-                        # demand = doli * boosting.detach().numpy()
-                        # pi = ((1 - gamma) * p - theta_d) * demand
-                        # pi -= c_i * (inv - np.array(x_t))
-                        # pi += -h_plus * np.maximum(0, inv - demand) + v_minus * np.minimum(0, inv - demand)
-                        first, second, boosting = platform.suggest(p)
-                        demand = doli * boosting
-                        pi = ((1 - gamma) * p - theta_d) * demand
-                        pi -= c_i * (inv - np.array(x_t))
-                        pi += -h_plus * np.maximum(0, inv - demand) + v_minus * np.minimum(0, inv - demand)
-                        # if t == max_t - 1:
-                        pi_plat = (gamma * p + theta_d) * demand
-                        pi_plat += (h_plus * np.maximum(0, inv - demand) - v_minus * np.minimum(0, inv - demand))/C
-                        pi_plat = np.sum(pi_plat)
-                        # print(pi_plat)
-                        plat_info = {
-                            "boosting": boosting,
-                            "doli": doli,
-                            "demand": demand,
-                            "price_val": first,
-                            "inv_val": second,
-                            'current_inventory': inv,
-                            "competitors_prices": p,
-                            "plat_pi": pi_plat,
-                            "timestamp": max_t - 1 - t + t * int(count_plat %2 != 1),
-                        }
-                        platform.cache_data(plat_info)
+                    # if not PLATFORM:
+                    #     pi = ((1 - gamma) * p - theta_d) * doli
+                    #     pi -= c_i * (inv - np.array(x_t))
+                    #     pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
+                    #     # print(pi)
+                    # else:
+                    #     # boosting = platform.suggest(p)
+                    #     # demand = doli * boosting.detach().numpy()
+                    #     # pi = ((1 - gamma) * p - theta_d) * demand
+                    #     # pi -= c_i * (inv - np.array(x_t))
+                    #     # pi += -h_plus * np.maximum(0, inv - demand) + v_minus * np.minimum(0, inv - demand)
+                    #     first, second, boosting = platform.suggest(p)
+                    #     demand = doli * boosting
+                    #     pi = ((1 - gamma) * p - theta_d) * demand
+                    #     pi -= c_i * (inv - np.array(x_t))
+                    #     pi += -h_plus * np.maximum(0, inv - demand) + v_minus * np.minimum(0, inv - demand)
+                    #     # if t == max_t - 1:
+                    #     pi_plat = (gamma * p + theta_d) * demand
+                    #     pi_plat += (h_plus * np.maximum(0, inv - demand) - v_minus * np.minimum(0, inv - demand))/C
+                    #     pi_plat = np.sum(pi_plat)
+                    #     # print("True", pi)
+                    #     # print("True P", pi_plat)
+                    #     plat_info = {
+                    #         "boosting": boosting,
+                    #         "doli": doli,
+                    #         "demand": demand,
+                    #         "price_val": first,
+                    #         "inv_val": second,
+                    #         'current_inventory': inv,
+                    #         "competitors_prices": p,
+                    #         "plat_pi": pi_plat,
+                    #         "timestamp": max_t - 1 - t,
+                    #     }
+                    #     # platform.cache_data(plat_info)
                     
+                    plat_info = {
+                        "doli": doli,
+                        "p": p,
+                        "stock": np.array(x_t),
+                        "inv": inv,
+                    }
+                    first, second, u_alpha, boosting = platform.suggest(plat_info)
+                    pi, pi_plat = profit_func(gamma, p, theta_d, doli, c_i, inv, np.array(x_t), h_plus, v_minus, C, boosting)
+                    plat_info = {
+                        "doli": doli,
+                        "p": p,
+                        "boosting": boosting,
+                        "first": first,
+                        "second": second,
+                        "stock": np.array(x_t),
+                        "inv": inv,
+                        "action": u_alpha,
+                        "plat_pi": pi_plat,
+                    }
+                    # print("Other", pi)
+                    # print("Other P", pi_plat)
+                    # if t == 124:
+                    #     a += 1
+                    platform.cache_data(plat_info)
+
                     ### БЫЛО:
                     # if len(learn) == MEMORY_VOLUME:
                     #     for i in range(n):
@@ -595,9 +569,9 @@ for env in range(ENV):
                 elif min(total_t + N_epochs, T) < T:
                     for i in range(n):
                         firms[i].update()
-                    count_plat += 1
-                    if PLATFORM and count_plat %2 == 0:
-                        platform.update()
+                    # count_plat += 1
+                    # if PLATFORM and count_plat %2 == 0:
+                    platform.update()
                     total_t = min(total_t + N_epochs, T)
                 else:
                     total_t = min(total_t + N_epochs, T)
@@ -657,16 +631,29 @@ for env in range(ENV):
 
                     doli = spros.distribution(p)
 
-                    if not PLATFORM:
-                        pi = ((1 - gamma) * p - theta_d) * doli
-                        pi -= c_i * (inv - np.array(x_t))
-                        pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
-                    else:
-                        boosting = platform.suggest(p)
-                        pi = ((1 - gamma) * p - theta_d) * doli * boosting
-                        pi -= c_i * (inv - np.array(x_t))
-                        pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
-                        platform.cache_data(doli)
+                    # if not PLATFORM:
+                    #     pi = ((1 - gamma) * p - theta_d) * doli
+                    #     pi -= c_i * (inv - np.array(x_t))
+                    #     pi += -h_plus * np.maximum(0, inv - doli) + v_minus * np.minimum(0, inv - doli)
+                    # else:
+                    #     boosting = platform.suggest(p)
+                    #     pi = ((1 - gamma) * p - theta_d) * doli * boosting
+                    #     pi -= c_i * (inv - np.array(x_t))
+                    #     pi += -h_plus * np.maximum(0, inv - doli * boosting) + v_minus * np.minimum(0, inv - doli * boosting)
+                    #     platform.cache_data(doli * boosting)
+                    
+                    first, second, boosting = platform.suggest(p)
+                    pi, pi_plat = profit_func(gamma, p, theta_d, doli, c_i, inv, np.array(x_t), h_plus, v_minus, C, boosting)
+                    plat_info = {
+                            "boosting": boosting,
+                            "doli": doli,
+                            "price_val": first,
+                            "inv_val": second,
+                            'current_inventory': inv,
+                            "competitors_prices": p,
+                            "plat_pi": pi_plat,
+                        }
+                    platform.cache_data(plat_info)
 
                     # if len(learn) == MEMORY_VOLUME:
                     #     for i in range(n):
