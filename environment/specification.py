@@ -83,7 +83,7 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 400000,         # 100000, 200000
+    "T": 100000,         # 100000, 200000
     "ENV": 1,
     "n": 2,
     "m": 30,
@@ -99,7 +99,7 @@ e1 = {
     "loc": "lower left",
     "VISUALIZE_THEORY": True,
     "VISUALIZE": True,
-    "SAVE": False,
+    "SAVE": True,
     "SUMMARY": True,
     "SHOW_PROM_RES": True,
     "SAVE_SUMMARY": True,
@@ -277,63 +277,44 @@ e4 = {
 ##########################
 ### Fixed weights platform
 ##########################
-# e5 = {
-#     "folder_num": "1",
-#     "PLATFORM": True,
-#     "plat_model": fixed_weights,
-#     "plat_params":{
-#         "weight": 1/3,
-#         "memory_size": e1["m"],
-#         "n": e1["n"],
-#         "p_inf": e2["p_inf"],
-#         "p_max": e2["p_sup"],
-#         "C": e3["demand_params"]["C"],
-#     }
-# }
+e5 = {
+    "folder_num": "1",
+    "PLATFORM": True,
+    "plat_model": fixed_weights,
+    "plat_params":{
+        "weight": 1/3,
+        "memory_size": e1["m"],
+        "n": e1["n"],
+        "p_inf": e2["p_inf"],
+        "p_max": e2["p_sup"],
+        "C": e3["demand_params"]["C"],
+    }
+}
 ##########################
-### PPO-C platform
+### Dynamic platform
 ##########################
 # e5 = {
 #     "folder_num": "2",
 #     "PLATFORM": True,
 #     "plat_model": dynamic_weights,
 #     "plat_params": {
-#         "demand_memory_size": e1["m"],
+#         "state_dim": 4 * MEMORY_VOLUME * e1["n"],
+#         "d_memory_size": e1["m"],
 #         "n": e1["n"],
 #         "p_inf": e2["p_inf"],
 #         "p_max": e2["p_sup"],
 #         "C": e3["demand_params"]["C"],
-#         "starting_weight": -float(np.log(2)),
-#         "delta": e1["delta"],
-#         "lr": 1.5 * 1e-4,
-#         "gamma": e1["gamma"],
-#         "theta_d": e1["theta_d"],
-#         "h_plus": e1["h_plus"],
-#         "v_minus": e1["v_minus"],
+#         "batch_size": 128,          # 32, 64, 100, 128
+#         "N_epochs": 256,            # 100, 200, e1["T"]//100
+#         "epochs": 10,               # 25
+#         "gamma": e1["delta"],
+#         "actor_lr": 1.5 * 1e-4,
+#         "critic_lr": 1.5 * 1e-4,
+#         "clip_eps": 0.2,
+#         "lmbda": 1,
+#         "cuda_usage": False,
 #         },
 # }
-e5 = {
-    "folder_num": "2",
-    "PLATFORM": True,
-    "plat_model": dynamic_weights,
-    "plat_params": {
-        "state_dim": 4 * MEMORY_VOLUME * e1["n"],
-        "d_memory_size": e1["m"],
-        "n": e1["n"],
-        "p_inf": e2["p_inf"],
-        "p_max": e2["p_sup"],
-        "C": e3["demand_params"]["C"],
-        "batch_size": 128,          # 32, 64, 100, 128
-        "N_epochs": 256,            # 100, 200, e1["T"]//100
-        "epochs": 10,               # 25
-        "gamma": e1["delta"],
-        "actor_lr": 1.5 * 1e-4,
-        "critic_lr": 1.5 * 1e-4,
-        "clip_eps": 0.2,
-        "lmbda": 1,
-        "cuda_usage": False,
-        },
-}
 
 Environment = e1 | e2 | e3 | e4 | e5
 

@@ -237,7 +237,7 @@ class dynamic_weights:
         alpha_mu, alpha_sigma = self.c_actor_net(state)
         
         u_alpha = torch.distributions.Normal(alpha_mu, alpha_sigma).sample()
-        weight = torch.sigmoid(u_alpha).item()
+        weight = torch.sigmoid(u_alpha/10).item()
         u_alpha = u_alpha.item()
 
         res = weight * first + (1 - weight) * second
