@@ -148,6 +148,7 @@ DIFF_PL = (str(platform) == "dynamic_weights")
 plat_epochs = 1
 if DIFF_PL:
     Platform_history = []
+    Platform_actions = []
     plat_epochs = Environment["plat_params"]["N_epochs"]
 
 def calc_profit_no_plat(gamma, p, theta_d, doli, c_i,
@@ -234,7 +235,7 @@ for env in range(ENV):
                 "stock": np.array(x_t),
                 "inv": inv,
             }
-            first, second, u_alpha, boosting = platform.suggest(plat_info)
+            first, second, w, boosting = platform.suggest(plat_info)
             pi, pi_plat = profit_func(gamma, p, theta_d, doli, c_i, inv, np.array(x_t), h_plus, v_minus, C, boosting)
             plat_info = {
                 "doli": doli,
@@ -244,7 +245,7 @@ for env in range(ENV):
                 "second": second,
                 "stock": np.array(x_t),
                 "inv": inv,
-                "action": u_alpha,
+                "action": w,
                 "plat_pi": pi_plat,
             }
             demand = doli * boosting
@@ -288,7 +289,7 @@ for env in range(ENV):
             raw_price_history.append(p)
             raw_stock_history.append(inv)
             if DIFF_PL:
-                raw_platform_history.append((pi_plat, u_alpha/10))
+                raw_platform_history.append((pi_plat, w))
 
     elif str(firms[0]) == "PPO_D":
         total_t = -MEMORY_VOLUME
@@ -452,7 +453,7 @@ for env in range(ENV):
                         "stock": np.array(x_t),
                         "inv": inv,
                     }
-                    first, second, u_alpha, boosting = platform.suggest(plat_info)
+                    first, second, w, boosting = platform.suggest(plat_info)
                     pi, pi_plat = profit_func(gamma, p, theta_d, doli, c_i, inv, np.array(x_t), h_plus, v_minus, C, boosting)
                     plat_info = {
                         "doli": doli,
@@ -462,7 +463,7 @@ for env in range(ENV):
                         "second": second,
                         "stock": np.array(x_t),
                         "inv": inv,
-                        "action": u_alpha,
+                        "action": w,
                         "plat_pi": pi_plat,
                     }
                     demand = doli * boosting
@@ -491,7 +492,7 @@ for env in range(ENV):
                     raw_price_history.append(p)
                     raw_stock_history.append(inv)
                     if DIFF_PL:
-                        raw_platform_history.append((pi_plat, u_alpha/10))
+                        raw_platform_history.append((pi_plat, w))
                 
                 if total_t < 0:
                     total_t = 0
@@ -565,7 +566,7 @@ for env in range(ENV):
                         "stock": np.array(x_t),
                         "inv": inv,
                     }
-                    first, second, u_alpha, boosting = platform.suggest(plat_info)
+                    first, second, w, boosting = platform.suggest(plat_info)
                     pi, pi_plat = profit_func(gamma, p, theta_d, doli, c_i, inv, np.array(x_t), h_plus, v_minus, C, boosting)
                     plat_info = {
                         "doli": doli,
@@ -575,7 +576,7 @@ for env in range(ENV):
                         "second": second,
                         "stock": np.array(x_t),
                         "inv": inv,
-                        "action": u_alpha,
+                        "action": w,
                         "plat_pi": pi_plat,
                     }
                     demand = doli * boosting
@@ -604,7 +605,7 @@ for env in range(ENV):
                     raw_price_history.append(p)
                     raw_stock_history.append(inv)
                     if DIFF_PL:
-                        raw_platform_history.append((pi_plat, u_alpha/10))
+                        raw_platform_history.append((pi_plat, w))
                     
                     if 0 < t and t % plat_epochs == 0:
                         platform.update()
@@ -634,6 +635,7 @@ for env in range(ENV):
         print(Stock_history[-1])
     if DIFF_PL:
         Platform_history.append(np.mean(raw_platform_history[-int(T/20):, 0]))
+        Platform_actions.append(np.mean(raw_platform_history[-int(T/20):, 1]))
         print(Platform_history[-1])
     if SHOW_PROM_RES:
         print(Profit_history[-1])
@@ -766,6 +768,8 @@ if VISUALIZE or SAVE:
             else:
                 mv = np.convolve(raw_platform_history[:, 0], kernel, mode='valid')
                 smoothed_pi = deepcopy(mv)
+                mv = np.convolve(raw_platform_history[:, 1], kernel, mode='valid')
+                smoothed_act = deepcopy(mv)
             
         if not DIFF_PL:
             for i in range(n):
@@ -776,9 +780,13 @@ if VISUALIZE or SAVE:
                     plotSecond.plot(mv, c = color[i], label = f"Фирма {i + 1}") # , linewidth= 0.2)
         else:
             if profit_dynamic == "compare":
-                plotThird.plot(smoothed_pi) #, label = "Платформа") # , linewidth= 0.2)
+                plotThird.plot(smoothed_pi, label = "Прибыль", color = "#FF7F00") # , linewidth= 0.2)
+                ax2 = plotThird.twinx()
+                ax2.plot(smoothed_act, label = "Коэфф., %", color = "#1874CD")
             else:
-                plotSecond.plot(smoothed_pi) #, label = "Платформа") # , linewidth= 0.2)
+                plotSecond.plot(smoothed_pi, label = "Прибыль", color = "#FF7F00") # , linewidth= 0.2)
+                ax2 = plotSecond.twinx()
+                ax2.plot(smoothed_act, label = "Коэфф., %", color = "#1874CD")
 
         if not DIFF_PL:
             if profit_dynamic != "compare":
@@ -801,12 +809,14 @@ if VISUALIZE or SAVE:
                 plotThird.legend(loc = loc)
         else:
             if profit_dynamic != "compare":
-                plotSecond.set_title("Динамика прибыли платформы")
+                plotSecond.set_title("Динамика прибыли платформы и коэфф. бустинга")
                 plotSecond.set_ylabel(f'Сглаженная прибыль (скользящее среднее по {window_size})')
+                ax2.set_ylabel(f'Сглаженный коэфф. (скользящее среднее по {window_size})')
                 plotSecond.set_xlabel('Итерация')
             else:
-                plotThird.set_title("Динамика прибыли платформы")
+                plotThird.set_title("Динамика прибыли платформы и коэфф. бустинга")
                 plotThird.set_ylabel(f'Сглаженная прибыль (скользящее среднее по {window_size})')
+                ax2.set_ylabel(f'Сглаженный коэфф. (скользящее среднее по {window_size})')
                 plotThird.set_xlabel('Итерация')
 
 
@@ -824,6 +834,8 @@ if SUMMARY:
     if DIFF_PL:
         Platform_history = np.array(Platform_history)
         print(f"Средняя прибыль платформы по последним {int(T/20)} раундов:", str(round(np.mean(Platform_history), 3)))
+        Platform_history = np.array(Platform_history)
+        print(f"Средний коэфф. значимости цены для бустинга по последним {int(T/20)} раундов:", str(round(np.mean(Platform_actions), 3)))
 
     print(f"Средняя прибыль по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)]))
 
@@ -896,8 +908,8 @@ if SAVE_SUMMARY or VISUALIZE:
         if DIFF_PL:
             path = os.path.join(res_name, "Platform_history.npy")
             np.save(path, Platform_history)
-            path = os.path.join(res_name, "one_weight_history.npy")
-            np.save(path, raw_platform_history[:, 1])
+            path = os.path.join(res_name, "Platform_actions.npy")
+            np.save(path, Platform_actions)
 
         with open(res_name + "summary.txt", "w+", encoding="utf-8") as f:
             A = ""
@@ -905,6 +917,12 @@ if SAVE_SUMMARY or VISUALIZE:
             A = A + "\n"
             if HAS_INV == 1:
                 A = A + f"Среднии запасы по последним {int(T/20)} раундов: " + " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)])
+                A = A + "\n"
+            
+            if DIFF_PL:
+                A = A + f"Средняя прибыль платформы по последним {int(T/20)} раундов: " + str(round(np.mean(Platform_history), 3))
+                A = A + "\n"
+                A = A + f"Средний коэфф. значимости цены для бустинга по последним {int(T/20)} раундов: " + str(round(np.mean(Platform_actions), 3))
                 A = A + "\n"
 
             A = A + f"Средняя прибыль по последним {int(T/20)} раундов: " + " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)])
