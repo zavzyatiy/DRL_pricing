@@ -636,7 +636,7 @@ for env in range(ENV):
     if DIFF_PL:
         Platform_history.append(np.mean(raw_platform_history[-int(T/20):, 0]))
         Platform_actions.append(np.mean(raw_platform_history[-int(T/20):, 1]))
-        print(Platform_history[-1])
+        print((Platform_history[-1], Platform_actions[-1]))
     if SHOW_PROM_RES:
         print(Profit_history[-1])
         print("-"*100)

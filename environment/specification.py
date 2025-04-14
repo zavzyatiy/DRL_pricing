@@ -84,7 +84,7 @@ class demand_function:
 
 e1 = {
     "T": 100000,         # 100000, 200000
-    "ENV": 67,
+    "ENV": 30,
     "n": 2,
     "m": 30,
     "delta": 0.95,      # 0.95, 0.99
@@ -142,55 +142,55 @@ ONLY_OWN = False
 ##########################
 ### TN_DDQN
 ##########################
-# assert mode == "D"
-# e4 = {
-#     "prices": prices,
-#     "inventory": inventory,
-#     "firm_model": TN_DDQN,
-#     "firm_params": {
-#         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
-#         "inventory_actions": inventory,
-#         "price_actions": prices,
-#         "MEMORY_VOLUME": MEMORY_VOLUME,
-#         "batch_size": 32, # 32
-#         "gamma": e1["delta"],
-#         "lr": 0.0001,
-#         "eps": 0.4,
-#         "mode": "zhou", # None, "sanchez_cartas", "zhou"
-#         "target_update_freq": 100, # e1["T"]//100, 100
-#         "memory_size": 1000, # 10000
-#         "cuda_usage": True,
-#         "eps_min": 0.01,
-#         "eps_max": 1,
-#         "beta": 1.5/(10**4),
-#     },
-#     "own": own,
-# }
-##########################
-### PPO-D
-##########################
 assert mode == "D"
 e4 = {
     "prices": prices,
     "inventory": inventory,
-    "firm_model": PPO_D,
+    "firm_model": TN_DDQN,
     "firm_params": {
         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
         "inventory_actions": inventory,
         "price_actions": prices,
-        "batch_size": 128,          # 32, 64, 100, 128
-        "N_epochs": 256,            # 100, 200, e1["T"]//100
-        "epochs": 10,               # 25
+        "MEMORY_VOLUME": MEMORY_VOLUME,
+        "batch_size": 32, # 32
         "gamma": e1["delta"],
-        "actor_lr": 1.5 * 1e-4,
-        "critic_lr": 1.5 * 1e-4,
-        "clip_eps": 0.2,
-        "lmbda": 1,
-        "cuda_usage": False,
+        "lr": 0.0001,
+        "eps": 0.4,
+        "mode": "zhou", # None, "sanchez_cartas", "zhou"
+        "target_update_freq": 100, # e1["T"]//100, 100
+        "memory_size": 1000, # 10000
+        "cuda_usage": True,
+        "eps_min": 0.01,
+        "eps_max": 1,
+        "beta": 1.5/(10**4),
     },
-    "MEMORY_VOLUME": MEMORY_VOLUME,
     "own": own,
 }
+##########################
+### PPO-D
+##########################
+# assert mode == "D"
+# e4 = {
+#     "prices": prices,
+#     "inventory": inventory,
+#     "firm_model": PPO_D,
+#     "firm_params": {
+#         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+#         "inventory_actions": inventory,
+#         "price_actions": prices,
+#         "batch_size": 128,          # 32, 64, 100, 128
+#         "N_epochs": 256,            # 100, 200, e1["T"]//100
+#         "epochs": 10,               # 25
+#         "gamma": e1["delta"],
+#         "actor_lr": 1.5 * 1e-4,
+#         "critic_lr": 1.5 * 1e-4,
+#         "clip_eps": 0.2,
+#         "lmbda": 1,
+#         "cuda_usage": False,
+#     },
+#     "MEMORY_VOLUME": MEMORY_VOLUME,
+#     "own": own,
+# }
 ##########################
 ### PPO-C
 ##########################
@@ -303,14 +303,14 @@ Environment = e1 | e2 | e3 | e4 | e5
 # Price_history = []
 # Profit_history = []
 # Stock_history = []
-# GENERAL_RES = "PPO_D"
+# GENERAL_RES = "PPO_C"
 # num = "2"
 # DIFF_PL = (num == "2")
 # if DIFF_PL:
 #     Platform_history = []
 #     Platform_actions = []
 
-# for i in range(1, 3 + 1):
+# for i in range(1, 5 + 1):
 #     folder_name = f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_{i}/"
 #     a1, a2, a3 = np.load(folder_name + "Price_history.npy"), np.load(folder_name + "Profit_history.npy"), np.load(folder_name + "Stock_history.npy")
 #     if DIFF_PL:
@@ -320,25 +320,30 @@ Environment = e1 | e2 | e3 | e4 | e5
 #     Profit_history = Profit_history + a2.tolist()
 #     Stock_history = Stock_history + a3.tolist()
 
-# Price_history = np.array(Price_history)
-# Profit_history = np.array(Profit_history)
-# Stock_history = np.array(Stock_history)
+# Price_history = np.array(Price_history[:200])
+# Profit_history = np.array(Profit_history[:200])
+# Stock_history = np.array(Stock_history[:200])
 # if DIFF_PL:
-#     Platform_history = np.array(Platform_history)
-#     Platform_actions = np.array(Platform_actions)
+#     Platform_history = np.array(Platform_history[:200])
+#     Platform_actions = np.array(Platform_actions[:200])
 
 # np.save(f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_0/Price_history.npy", Price_history)
 # np.save(f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_0/Profit_history.npy", Profit_history)
 # np.save(f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_0/Stock_history.npy", Stock_history)
 # if DIFF_PL:
-#     np.save(f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_0/Profit_history.npy", Platform_history)
-#     np.save(f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_0/Stock_history.npy", Platform_actions)
+#     np.save(f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_0/Platform_history.npy", Platform_history)
+#     np.save(f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_0/Platform_actions.npy", Platform_actions)
+
+# # counts, bins = np.histogram(Platform_history)
+# # counts = counts / len(Platform_history)
+# # plt.hist(bins[:-1], bins, weights=counts, color = "#8B8B83")
+# # plt.show()
 
 # print(len(Profit_history))
 
 # n = 2
 # res_name = f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_0/"
-# T = 200000
+# T = 100000
 # HAS_INV = 1
 # c_i = Environment["c_i"]
 # gamma = Environment["gamma"]
@@ -359,6 +364,12 @@ Environment = e1 | e2 | e3 | e4 | e5
 #     if HAS_INV == 1:
 #         A = A + f"Среднии запасы по последним {int(T/20)} раундов: " + " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)])
 #         A = A + "\n"
+    
+#     if DIFF_PL:
+#         A = A + f"Средняя прибыль платформы по последним {int(T/20)} раундов: " + str(round(np.mean(Platform_history), 3))
+#         A = A + "\n"
+#         A = A + f"Средний коэфф. значимости цены для бустинга по последним {int(T/20)} раундов: " + str(round(np.mean(Platform_actions), 3))
+#         A = A + "\n"
 
 #     A = A + f"Средняя прибыль по последним {int(T/20)} раундов: " + " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)])
 #     A = A + "\n"
@@ -370,12 +381,6 @@ Environment = e1 | e2 | e3 | e4 | e5
 
 #     if HAS_INV == 1:
 #         A = A + "Теоретические инв. в запасы: " + f"{round(inv_NE , 3)}, {round(inv_M , 3)}"
-#         A = A + "\n"
-
-#     if DIFF_PL:
-#         A = A + f"Средняя прибыль платформы по последним {int(T/20)} раундов: " + str(round(np.mean(Platform_history), 3))
-#         A = A + "\n"
-#         A = A + f"Средний коэфф. значимости цены для бустинга по последним {int(T/20)} раундов: " + str(round(np.mean(Platform_actions), 3))
 #         A = A + "\n"
 
 #     A = A + "Теоретические прибыли: " + f"{round(pi_NE , 3)}, {round(pi_M , 3)}"
