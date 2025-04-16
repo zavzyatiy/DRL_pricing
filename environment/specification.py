@@ -84,7 +84,7 @@ class demand_function:
 
 e1 = {
     "T": 200000,         # 100000, 200000
-    "ENV": 42,
+    "ENV": 1,
     "n": 2,
     "m": 30,
     "delta": 0.95,      # 0.95, 0.99
@@ -103,7 +103,7 @@ e1 = {
     "SUMMARY": True,
     "SHOW_PROM_RES": True,
     "SAVE_SUMMARY": True,
-    "RANDOM_SEED": 98,
+    "RANDOM_SEED": 42,
 }
 
 # Это чтобы я случайно не потерял все результаты симуляций
@@ -256,45 +256,45 @@ e4 = {
 ##########################
 ### Fixed weights platform
 ##########################
-e5 = {
-    "folder_num": "1",
-    "PLATFORM": True,
-    "plat_model": fixed_weights,
-    "plat_params":{
-        "weight": 1/3,
-        "memory_size": e1["m"],
-        "n": e1["n"],
-        "p_inf": e2["p_inf"],
-        "p_max": e2["p_sup"],
-        "C": e3["demand_params"]["C"],
-    }
-}
-##########################
-### Dynamic platform
-##########################
 # e5 = {
-#     "folder_num": "2",
+#     "folder_num": "1",
 #     "PLATFORM": True,
-#     "plat_model": dynamic_weights,
-#     "plat_params": {
-#         "state_dim": 2 * MEMORY_VOLUME * e1["n"] + 2 * MEMORY_VOLUME * (e1["n"] - 1),
-#         "d_memory_size": e1["m"],
-#         "alpha_actions": np.linspace(0, 1, max(e2["arms_amo_price"], e2["arms_amo_inv"])),
+#     "plat_model": fixed_weights,
+#     "plat_params":{
+#         "weight": 1/3,
+#         "memory_size": e1["m"],
 #         "n": e1["n"],
 #         "p_inf": e2["p_inf"],
 #         "p_max": e2["p_sup"],
 #         "C": e3["demand_params"]["C"],
-#         "batch_size": 128,          # 32, 64, 100, 128
-#         "N_epochs": 256,            # 100, 200, e1["T"]//100
-#         "epochs": 10,               # 25
-#         "gamma": e1["delta"],
-#         "actor_lr": 1.5 * 1e-4,
-#         "critic_lr": 1.5 * 1e-4,
-#         "clip_eps": 0.2,
-#         "lmbda": 1,
-#         "cuda_usage": False,
-#         },
+#     }
 # }
+##########################
+### Dynamic platform
+##########################
+e5 = {
+    "folder_num": "2",
+    "PLATFORM": True,
+    "plat_model": dynamic_weights,
+    "plat_params": {
+        "state_dim": 2 * MEMORY_VOLUME * e1["n"] + 2 * MEMORY_VOLUME * (e1["n"] - 1),
+        "d_memory_size": e1["m"],
+        "alpha_actions": np.linspace(0, 1, max(e2["arms_amo_price"], e2["arms_amo_inv"])),
+        "n": e1["n"],
+        "p_inf": e2["p_inf"],
+        "p_max": e2["p_sup"],
+        "C": e3["demand_params"]["C"],
+        "batch_size": 128,          # 32, 64, 100, 128
+        "N_epochs": 256,            # 100, 200, e1["T"]//100
+        "epochs": 10,               # 25
+        "gamma": e1["delta"],
+        "actor_lr": 1.5 * 1e-4,
+        "critic_lr": 1.5 * 1e-4,
+        "clip_eps": 0.2,
+        "lmbda": 1,
+        "cuda_usage": False,
+        },
+}
 
 Environment = e1 | e2 | e3 | e4 | e5
 
@@ -304,13 +304,13 @@ Environment = e1 | e2 | e3 | e4 | e5
 # Profit_history = []
 # Stock_history = []
 # GENERAL_RES = "SAC"
-# num = "1"
+# num = "2"
 # DIFF_PL = (num == "2")
 # if DIFF_PL:
 #     Platform_history = []
 #     Platform_actions = []
 
-# for i in range(1, 6 + 1):
+# for i in range(1, 8 + 1):
 #     folder_name = f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_{i}/"
 #     a1, a2, a3 = np.load(folder_name + "Price_history.npy"), np.load(folder_name + "Profit_history.npy"), np.load(folder_name + "Stock_history.npy")
 #     if DIFF_PL:

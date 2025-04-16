@@ -12,9 +12,9 @@ from scipy import stats
 
 from specification import Environment, demand_function
 
-SHOW = False
-CREATE = False
-SQUEEZE = False
+SHOW = True
+CREATE = True
+SQUEEZE = True
 KS = True
 platform = "fixed"
 num = "1"
