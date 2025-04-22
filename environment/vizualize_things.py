@@ -9,6 +9,8 @@ import os
 import matplotlib.gridspec as gridspec
 import pandas as pd
 from scipy import stats
+import json
+from copy import deepcopy
 
 from specification import Environment, demand_function
 
@@ -16,9 +18,11 @@ SHOW = False
 CREATE = False
 SQUEEZE = False
 KS = False
-VAR = False
+SPLASH = True
 pl_list = ["None", "fixed" ,"dynamic"]
-num = "2"
+num = "1"
+GENERAL_RES = "PPO_C"
+files_amo = 3
 platform = pl_list[int(num)]
 DIFF_PL = (num == "2")
 files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
@@ -44,8 +48,135 @@ end_collusion = """\end{center}
 \end{table}
 \egroup"""
 
+if SPLASH:
+
+    Price_history = []
+    Profit_history = []
+    Stock_history = []
+    if DIFF_PL:
+        Platform_history = []
+        Platform_actions = []
+
+    for i in range(1, files_amo + 1):
+        folder_name = f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_{i}/"
+        a1, a2, a3 = np.load(folder_name + "Price_history.npy"), np.load(folder_name + "Profit_history.npy"), np.load(folder_name + "Stock_history.npy")
+        if DIFF_PL:
+            Platform_history = Platform_history + np.load(folder_name + "Platform_history.npy").tolist()
+            Platform_actions = Platform_actions + np.load(folder_name + "Platform_actions.npy").tolist()
+        Price_history = Price_history + a1.tolist()
+        Profit_history = Profit_history + a2.tolist()
+        Stock_history = Stock_history + a3.tolist()
+    
+    Price_history = np.array(Price_history[:200])
+    Profit_history = np.array(Profit_history[:200])
+    Stock_history = np.array(Stock_history[:200])
+    if DIFF_PL:
+        Platform_history = np.array(Platform_history[:200])
+        Platform_actions = np.array(Platform_actions[:200])
+
+    print(len(Price_history))
+
+    res_name = f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_0/"
+
+    if not os.path.exists(res_name):
+        os.makedirs(res_name)
+
+    np.save(res_name + "Price_history.npy", Price_history)
+    np.save(res_name + "Profit_history.npy", Profit_history)
+    np.save(res_name + "Stock_history.npy", Stock_history)
+    if DIFF_PL:
+        np.save(res_name + "Platform_history.npy", Platform_history)
+        np.save(res_name + "Platform_actions.npy", Platform_actions)
+    
+    info_ENV_SEED = []
+    for i in range(1, files_amo + 1):
+        with open(f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_{i}/" + "params.txt", "r", encoding="utf-8") as f:
+            B = f.readlines()
+            B = "\n".join(B).replace("true", "True").replace("false", "False")
+            B = eval(B)
+            if i == 1:
+                A = deepcopy(B)
+            info_ENV_SEED.append((B["RANDOM_SEED"], B["ENV"]))
+
+    A["ENV"] = sum([x[1] for x in info_ENV_SEED])
+    A["RANDOM_SEED"] = 42
+
+    with open(res_name + "params.txt", "w+", encoding="utf-8") as f:
+            json.dump(A, f, indent=4)
+    with open(res_name + "params.txt", "r+", encoding="utf-8") as f:
+        B = f.readlines()
+    with open(res_name + "params.txt", "w+", encoding="utf-8") as f:
+        B[2] = B[2][:-2] + " ### Из-за ограничений по мощностям усреднение было таким: "
+        B[2] = B[2] + ", ".join(['{"ENV": ' + str(x[0]) + ' , "RANDOM_SEED": ' + str(x[1]) + '}' for x in info_ENV_SEED]) + "\n"
+        f.write("".join(B))
+
+    KNOWLEDGE_HORIZON = 0.05 * A["T"]
+    HAS_INV = 1
+    c_i = A["c_i"]
+    gamma = A["gamma"]
+    theta_d = A["theta_d"]
+    n = A["n"]
+    a_ = A["demand_params"]["a"]
+    mu = A["demand_params"]["mu"]
+    C = A["demand_params"]["C"]
+    m = A["m"]
+    p_sup = A["p_sup"]
+    p_inf = A["p_inf"]
+
+    VISUALIZE_THEORY = 1
+
+    demand_params = A["demand_params"]
+    spros = demand_function(**demand_params)
+    if VISUALIZE_THEORY:
+        p_NE, p_M, pi_NE, pi_M = spros.get_theory(c_i, gamma, theta_d)
+        inv_NE, inv_M = spros.distribution([p_NE]*n)[0], spros.distribution([p_M]*n)[0]
+
+    with open(res_name + "summary.txt", "w+", encoding="utf-8") as f:
+        A = ""
+        A = A + f"Средняя цена по последним {int(KNOWLEDGE_HORIZON)} раундов: " + " ".join([str(round(np.mean(Price_history[:, i]), 3)) for i in range(n)])
+        A = A + "\n"
+        if HAS_INV == 1:
+            A = A + f"Среднии запасы по последним {int(KNOWLEDGE_HORIZON)} раундов: " + " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)])
+            A = A + "\n"
+        
+        if DIFF_PL:
+            A = A + f"Средняя прибыль платформы по последним {int(KNOWLEDGE_HORIZON)} раундов: " + str(round(np.mean(Platform_history[:]), 3))
+            A = A + "\n"
+            A = A + f"Средний коэфф. значимости цены для бустинга по последним {int(KNOWLEDGE_HORIZON)} раундов: " + str(round(np.mean(Platform_actions[:]), 3))
+            A = A + "\n"
+
+        A = A + f"Средняя прибыль по последним {int(KNOWLEDGE_HORIZON)} раундов: " + " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)])
+        A = A + "\n"
+
+        if VISUALIZE_THEORY:
+            A = A + "-"*20*n
+            A = A + "\n"
+            A = A + "Теоретические цены: " + f"{round(p_NE , 3)}, {round(p_M , 3)}"
+            A = A + "\n"
+
+            if HAS_INV == 1:
+                A = A + "Теоретические инв. в запасы: " + f"{round(inv_NE , 3)}, {round(inv_M , 3)}"
+                A = A + "\n"
+
+            A = A + "Теоретические прибыли: " + f"{round(pi_NE , 3)}, {round(pi_M , 3)}"
+            A = A + "\n"
+
+            A = A + "-"*20*n
+            A = A + "\n"
+            A = A + "Индекс сговора по цене: " + str(round(100 * (np.mean(Price_history) - p_NE)/(p_M - p_NE), 2)) + "%"
+            A = A + "\n"
+
+            if HAS_INV == 1:
+                A = A + "Индекс сговора по запасам: " + str(round(100 * (np.mean(Stock_history) - inv_NE)/(inv_M - inv_NE), 2)) + "%"
+                A = A + "\n"
+
+            A = A + "Индекс сговора по прибыли: " + str(round(100 * (np.mean(Profit_history) - pi_NE)/(pi_M - pi_NE), 2)) + "%"
+            A = A + "\n"
+        f.write(A)
+
+
 if KS:
-    files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"][:-1]
+    files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
     files = [x.replace("_0", "_0_0") for x in files]
     Price_zero = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy") for x in files]
     Profit_zero = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Profit_history.npy") for x in files]
@@ -53,7 +184,7 @@ if KS:
     data = np.array([Price_zero, Stock_zero, Profit_zero])
     data_old = data.transpose(1, 0, 2, 3)
 
-    files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"][:-1]
+    files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
     files = [x.replace("_0", f"_{num}_0") for x in files]
     Price_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy") for x in files]
     Profit_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Profit_history.npy") for x in files]
@@ -325,50 +456,3 @@ if SQUEEZE:
         plt.show()
 
 
-def bootstrap_test(sample1, sample2, stat_func=np.mean, n_boot=10000):
-    observed_diff = stat_func(sample1) - stat_func(sample2)
-    pooled = np.concatenate([sample1, sample2])
-    n1, n2 = len(sample1), len(sample2)
-    
-    boot_diffs = []
-    for _ in range(n_boot):
-        boot1 = np.random.choice(pooled, size=n1, replace=True)
-        boot2 = np.random.choice(pooled, size=n2, replace=True)
-        diff = stat_func(boot1) - stat_func(boot2)
-        boot_diffs.append(diff)
-    p_value = (np.abs(boot_diffs) >= np.abs(observed_diff)).mean()
-    
-    return observed_diff, p_value
-
-
-# if VAR:
-#     assert platform in ["None", "fixed", "dynamic"]
-
-#     files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"][:-1]
-#     files = [x.replace("_0", "_0_0") for x in files]
-#     Price_zero = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy") for x in files]
-#     Profit_zero = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Profit_history.npy") for x in files]
-#     Stock_zero = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Stock_history.npy") for x in files]
-#     data = np.array([Price_zero, Stock_zero, Profit_zero])
-#     data_old = data.transpose(1, 0, 2, 3)
-
-#     files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"][:-1]
-#     files = [x.replace("_0", f"_{num}_0") for x in files]
-#     Price_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy") for x in files]
-#     Profit_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Profit_history.npy") for x in files]
-#     Stock_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Stock_history.npy") for x in files]
-#     data = np.array([Price_list, Stock_list, Profit_list])
-#     data_new = data.transpose(1, 0, 2, 3)
-
-#     demand_params = Environment["demand_params"]
-#     spros = demand_function(**demand_params)
-#     gamma = Environment["gamma"]
-#     theta_d = Environment["theta_d"]
-#     p_NE, p_M, pi_NE, pi_M = spros.get_theory(Environment["c_i"], gamma, theta_d)
-#     inv_NE, inv_M = spros.distribution([p_NE]*Environment["n"])[0], spros.distribution([p_M]*Environment["n"])[0]
-
-#     th = [(p_NE, p_M), (inv_NE, inv_M), (pi_NE, pi_M)]
-
-#     print(data_old[0][2][:5])
-
-#     print(bootstrap_test(data_old[0][2].flatten(), data_new[0][2].flatten()))
