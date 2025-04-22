@@ -385,9 +385,11 @@ class PPO_D_ActorNet(nn.Module):
         
         self.d_actor_net = nn.Sequential(
             nn.Linear(input_dim, sloy),
-            nn.ReLU(),
+            # nn.LayerNorm(sloy),
+            nn.ELU(), # nn.ReLU(),
             nn.Linear(sloy, sloy),
-            nn.ReLU(),
+            # nn.LayerNorm(sloy),
+            nn.ELU(), # nn.ReLU(),
         )
 
         self.alpha_size = len(alpha_actions)
@@ -410,9 +412,11 @@ class PPO_D_CriticNet(nn.Module):
         
         self.c_critic_net = nn.Sequential(
             nn.Linear(input_dim, sloy),
-            nn.ReLU(),
+            # nn.LayerNorm(sloy),
+            nn.ELU(), # nn.ReLU(),
             nn.Linear(sloy, sloy),
-            nn.ReLU(),
+            # nn.LayerNorm(sloy),
+            nn.ELU(), # nn.ReLU(),
             nn.Linear(sloy, 1)
             )
 

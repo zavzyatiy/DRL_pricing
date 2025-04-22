@@ -12,16 +12,18 @@ from scipy import stats
 
 from specification import Environment, demand_function
 
-SHOW = True
-CREATE = True
-SQUEEZE = True
-KS = True
-platform = "fixed"
-num = "1"
+SHOW = False
+CREATE = False
+SQUEEZE = False
+KS = False
+VAR = False
+pl_list = ["None", "fixed" ,"dynamic"]
+num = "2"
+platform = pl_list[int(num)]
+DIFF_PL = (num == "2")
 files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
 files = [x.replace("_0", f"_{num}_0") for x in files]
 names = ["TN-DDQN", "PPO-D", "PPO-C", "SAC"]
-assert not(platform in ["None"])
 
 start_collusion = """\\bgroup
 \def\arraystretch{1.25}
@@ -43,7 +45,7 @@ end_collusion = """\end{center}
 \egroup"""
 
 if KS:
-    files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
+    files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"][:-1]
     files = [x.replace("_0", "_0_0") for x in files]
     Price_zero = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy") for x in files]
     Profit_zero = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Profit_history.npy") for x in files]
@@ -51,7 +53,7 @@ if KS:
     data = np.array([Price_zero, Stock_zero, Profit_zero])
     data_old = data.transpose(1, 0, 2, 3)
 
-    files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
+    files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"][:-1]
     files = [x.replace("_0", f"_{num}_0") for x in files]
     Price_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy") for x in files]
     Profit_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Profit_history.npy") for x in files]
@@ -76,14 +78,14 @@ if KS:
             elif (d.pvalue >= 0.1):
                 a = d
                 sign = "0"
-            # if i in [1, 2] and j == 1:
-            #     print(b.pvalue, c.pvalue)
-            #     res1 = stats.ecdf(data_new[i][j].flatten())
-            #     res2 = stats.ecdf(data_old[i][j].flatten())
-            #     ax = plt.subplot()
-            #     res1.cdf.plot(ax, color = "blue")
-            #     res2.cdf.plot(ax, color = "orange")
-            #     plt.show()
+            if i in [0] and j == 0:
+                print(b.pvalue, c.pvalue, d.pvalue)
+                res1 = stats.ecdf(data_new[i][j].flatten())
+                res2 = stats.ecdf(data_old[i][j].flatten())
+                ax = plt.subplot()
+                res1.cdf.plot(ax, color = "blue")
+                res2.cdf.plot(ax, color = "orange")
+                plt.show()
             dots = "*" * int(a.pvalue < 0.1)  + "*" * int(a.pvalue < 0.05)  + "*" * int(a.pvalue < 0.01)
             text = "$"* int(len(dots) > 0) + str(round(a.statistic, 2)) + ("^{" + dots + "}") * int(len(dots) > 0)
             text = "\makecell[c]{ " + text + ("_{" + sign + "} $") * int(len(dots) > 0) +"\\\\[1ex] }" # + (" \\\\ (" + sign + ") ") * int(len(dots) > 0)
@@ -112,7 +114,7 @@ if CREATE:
 
 
 if SHOW:
-    assert platform in ["None", "fixed", "PPO", "SAC"]
+    assert platform in ["None", "fixed", "dynamic"]
 
     Price_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy") for x in files]
     Profit_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Profit_history.npy") for x in files]
@@ -135,6 +137,7 @@ if SHOW:
     # ex = [tuple([min(x) - d*(max(x) - min(x)), max(x) + d*(max(x) - min(x))]) for x in th[:2]]
     # ex = ex + [(-15, 15)]
     lab = ["price", "stock", "profit"]
+    y_lab = ["Цены", "Запасы", "Прибыль"]
 
     # fig, axes = plt.subplots(3, len(files), figsize=(16, 8))
     gs = gridspec.GridSpec(4, len(files), height_ratios=[1, 1, 1, 0.02],
@@ -173,6 +176,9 @@ if SHOW:
 
             if i == 0:
                 ax.set_title(names[j], fontsize= 20)
+            
+            if j == 0:
+                ax.set_ylabel(y_lab[i], fontsize= 16)
 
             # Скрыть числовые метки на осях
             # ax.set_xticks([])
@@ -200,14 +206,14 @@ if SHOW:
     # max_value = max([hist.max() / len(data[i][j]) for i in range(3) for j in range(len(files))])
     # ticks = np.linspace(0, max_value, 11)
     # cbar = fig.colorbar(im, cax=cbar_ax, orientation='horizontal', ticks = [round(x, 2) for x in ticks]) # , pad=0.01
-    # cbar.set_label('Occurrence Ratio', fontsize= 10)
+    # cbar.set_label('Частота', fontsize= 10)
 
     cbar_ax = fig.add_subplot(gs[3, :])
     max_value = max([hist.max() / len(data[i][j]) for i in range(3) for j in range(len(files))])
     ticks = np.linspace(0, max_value, 11)
     cbar = fig.colorbar(im, cax=cbar_ax, orientation='horizontal', ticks = [round(x, 2) for x in ticks]) # , pad=0.01
     cbar.ax.tick_params(labelsize=16)
-    cbar.set_label('Occurrence Ratio', fontsize= 16)
+    cbar.set_label('Частота', fontsize= 16)
     cbar_ax.set_position([0.1, 0.1, 0.8, 0.01])
 
     # Корректировка междуграфических отступов
@@ -219,11 +225,14 @@ if SHOW:
 
 
 if SQUEEZE:
-    assert platform in ["None", "fixed", "PPO", "SAC"]
+    assert platform in ["None", "fixed", "dynamic"]
 
     Price_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy").flatten() for x in files]
     Profit_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Profit_history.npy").flatten() for x in files]
     Stock_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Stock_history.npy").flatten() for x in files]
+    if DIFF_PL:
+        Platform_history = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Platform_history.npy").flatten() for x in files]
+        Platform_actions = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Platform_actions.npy").flatten() for x in files]
 
     data = [Price_list, Stock_list, Profit_list]
 
@@ -235,6 +244,7 @@ if SQUEEZE:
     inv_NE, inv_M = spros.distribution([p_NE]*Environment["n"])[0], spros.distribution([p_M]*Environment["n"])[0]
 
     th = [(p_NE, p_M), (inv_NE, inv_M), (pi_NE, pi_M)]
+    y_lab = ["Цены", "Запасы", "Прибыль"]
 
     gs = gridspec.GridSpec(4, len(files), height_ratios=[1, 1, 1, 0.02],
                            hspace=0.35, wspace=0.2)
@@ -258,6 +268,9 @@ if SQUEEZE:
 
             if i == 0 and j == 0:
                 ax.legend(fontsize=14, loc = "upper right")
+            
+            if j == 0:
+                ax.set_ylabel(y_lab[i], fontsize=16)
 
             lower_bound = min(th[i][0], th[i][1])
             upper_bound = max(th[i][0], th[i][1])
@@ -275,21 +288,87 @@ if SQUEEZE:
             mx = max(bins)
             mn = min(bins)
 
-            # ax.text(
-            #     th[i][0] - 0.05 * (mx - mn), 0.8, 'NE',
-            #     transform=ax.get_xaxis_transform(), fontsize=16,
-            #     ha='center', va='bottom', color='blue'
-            # )
-
-            # ax.text(
-            #     th[i][1] - 0.05 * (mx - mn), 0.8, 'M',
-            #     transform=ax.get_xaxis_transform(), fontsize=16,
-            #     ha='center', va='bottom', color='#00CD00'
-            # )
-
             if i == 2:
                 ax.axvline(x=0, color='black', linestyle='--', linewidth=1)
 
     plt.savefig(f"./DRL_pricing/environment/simulation_results/platforms/dencies_platform_{platform}", dpi = 200, bbox_inches='tight')
 
     plt.show()
+
+    if DIFF_PL:
+        data = [Platform_actions, Platform_history]
+
+        gs = gridspec.GridSpec(4, len(files), height_ratios=[1, 1, 1, 0.02],
+                            hspace=0.35, wspace=0.2)
+        fig = plt.figure(figsize=(20, 12))
+
+        y_lab = ["Коэфф. бустинга, %", "Прибыль"]
+
+        for i in range(2):
+            for j in range(len(files)):
+                
+                ax = fig.add_subplot(gs[i, j])
+
+                counts, bins = np.histogram(data[i][j])
+                counts = counts / len(data[i][j])
+
+                ax.hist(bins[:-1], bins, weights=counts, color = "#8B8B83") # , edgecolor='black'
+
+                if i == 0:
+                    ax.set_title(names[j], fontsize= 20)
+
+                if j == 0:
+                    ax.set_ylabel(y_lab[i], fontsize=16)
+
+        plt.savefig(f"./DRL_pricing/environment/simulation_results/platforms/dencies_platform_{platform}_PL", dpi = 200, bbox_inches='tight')
+
+        plt.show()
+
+
+def bootstrap_test(sample1, sample2, stat_func=np.mean, n_boot=10000):
+    observed_diff = stat_func(sample1) - stat_func(sample2)
+    pooled = np.concatenate([sample1, sample2])
+    n1, n2 = len(sample1), len(sample2)
+    
+    boot_diffs = []
+    for _ in range(n_boot):
+        boot1 = np.random.choice(pooled, size=n1, replace=True)
+        boot2 = np.random.choice(pooled, size=n2, replace=True)
+        diff = stat_func(boot1) - stat_func(boot2)
+        boot_diffs.append(diff)
+    p_value = (np.abs(boot_diffs) >= np.abs(observed_diff)).mean()
+    
+    return observed_diff, p_value
+
+
+# if VAR:
+#     assert platform in ["None", "fixed", "dynamic"]
+
+#     files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"][:-1]
+#     files = [x.replace("_0", "_0_0") for x in files]
+#     Price_zero = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy") for x in files]
+#     Profit_zero = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Profit_history.npy") for x in files]
+#     Stock_zero = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Stock_history.npy") for x in files]
+#     data = np.array([Price_zero, Stock_zero, Profit_zero])
+#     data_old = data.transpose(1, 0, 2, 3)
+
+#     files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"][:-1]
+#     files = [x.replace("_0", f"_{num}_0") for x in files]
+#     Price_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy") for x in files]
+#     Profit_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Profit_history.npy") for x in files]
+#     Stock_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Stock_history.npy") for x in files]
+#     data = np.array([Price_list, Stock_list, Profit_list])
+#     data_new = data.transpose(1, 0, 2, 3)
+
+#     demand_params = Environment["demand_params"]
+#     spros = demand_function(**demand_params)
+#     gamma = Environment["gamma"]
+#     theta_d = Environment["theta_d"]
+#     p_NE, p_M, pi_NE, pi_M = spros.get_theory(Environment["c_i"], gamma, theta_d)
+#     inv_NE, inv_M = spros.distribution([p_NE]*Environment["n"])[0], spros.distribution([p_M]*Environment["n"])[0]
+
+#     th = [(p_NE, p_M), (inv_NE, inv_M), (pi_NE, pi_M)]
+
+#     print(data_old[0][2][:5])
+
+#     print(bootstrap_test(data_old[0][2].flatten(), data_new[0][2].flatten()))

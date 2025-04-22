@@ -146,6 +146,7 @@ PL = Environment["plat_model"]
 platform = PL(**Environment["plat_params"])
 DIFF_PL = (str(platform) == "dynamic_weights")
 plat_epochs = 1
+KNOWLEDGE_HORIZON = 0.01 * T
 if DIFF_PL:
     Platform_history = []
     Platform_actions = []
@@ -168,6 +169,21 @@ def calc_profit_with_plat(gamma, p, theta_d, doli, c_i,
     pi_plat += 0.5 * (h_plus * np.maximum(0, inv - demand) - v_minus * np.minimum(0, inv - demand)) / max(h_plus, v_minus)
     pi_plat = np.sum(pi_plat)
     return (pi, pi_plat)
+
+
+if SAVE_SUMMARY:
+    folders = []
+    num = Environment["folder_num"]
+    dest = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))) + "/simulation_results/"
+    for f in os.listdir(dest):
+        if not("." in str(f)) and (str(M(**firm_params)) + "_" + num in str(f)):
+            folders.append(f)
+
+    res_name = dest + f"/{str(M(**firm_params))}_{num}_{len(folders) + 1}/"
+
+    if not os.path.exists(res_name):
+        os.makedirs(res_name)
+
 
 for env in range(ENV):
 
@@ -285,11 +301,12 @@ for env in range(ENV):
 
             mem = learn.copy()
 
-            raw_profit_history.append(pi)
-            raw_price_history.append(p)
-            raw_stock_history.append(inv)
-            if DIFF_PL:
-                raw_platform_history.append((pi_plat, w))
+            if env == ENV - 1 or t >= T - int(2 * KNOWLEDGE_HORIZON):
+                raw_profit_history.append(pi)
+                raw_price_history.append(p)
+                raw_stock_history.append(inv)
+                if DIFF_PL:
+                    raw_platform_history.append((pi_plat, w))
 
     elif str(firms[0]) == "PPO_D":
         total_t = -MEMORY_VOLUME
@@ -379,11 +396,13 @@ for env in range(ENV):
                     mem = learn.copy()
 
                     pbar.update(1)
-                    raw_profit_history.append(pi)
-                    raw_price_history.append(p)
-                    raw_stock_history.append(inv)
-                    if DIFF_PL:
-                        raw_platform_history.append((pi_plat, w))
+
+                    if env == ENV - 1 or t >= T - int(2 * KNOWLEDGE_HORIZON):
+                        raw_profit_history.append(pi)
+                        raw_price_history.append(p)
+                        raw_stock_history.append(inv)
+                        if DIFF_PL:
+                            raw_platform_history.append((pi_plat, w))
                 
                 if total_t < 0:
                     total_t = 0
@@ -488,11 +507,13 @@ for env in range(ENV):
                     mem = learn.copy()
 
                     pbar.update(1)
-                    raw_profit_history.append(pi)
-                    raw_price_history.append(p)
-                    raw_stock_history.append(inv)
-                    if DIFF_PL:
-                        raw_platform_history.append((pi_plat, w))
+
+                    if env == ENV - 1 or t >= T - int(2 * KNOWLEDGE_HORIZON):
+                        raw_profit_history.append(pi)
+                        raw_price_history.append(p)
+                        raw_stock_history.append(inv)
+                        if DIFF_PL:
+                            raw_platform_history.append((pi_plat, w))
                 
                 if total_t < 0:
                     total_t = 0
@@ -601,11 +622,13 @@ for env in range(ENV):
                     mem = learn.copy()
 
                     pbar.update(1)
-                    raw_profit_history.append(pi)
-                    raw_price_history.append(p)
-                    raw_stock_history.append(inv)
-                    if DIFF_PL:
-                        raw_platform_history.append((pi_plat, w))
+
+                    if env == ENV - 1 or t >= T - int(2 * KNOWLEDGE_HORIZON):
+                        raw_profit_history.append(pi)
+                        raw_price_history.append(p)
+                        raw_stock_history.append(inv)
+                        if DIFF_PL:
+                            raw_platform_history.append((pi_plat, w))
                     
                     if 0 < t and t % plat_epochs == 0:
                         platform.update()
@@ -626,16 +649,61 @@ for env in range(ENV):
     if DIFF_PL:
         raw_platform_history = np.array(raw_platform_history)
 
-    Price_history.append(tuple([np.mean(raw_price_history[-int(T/20):, i]) for i in range(n)]))
-    Profit_history.append(tuple([np.mean(raw_profit_history[-int(T/20):, i]) for i in range(n)]))
+    # Price_history.append(tuple([np.mean(raw_price_history[-int(0.05 * T):, i]) for i in range(n)]))
+    # Profit_history.append(tuple([np.mean(raw_profit_history[-int(0.05 * T):, i]) for i in range(n)]))
+    # if SHOW_PROM_RES:
+    #     print("\n", Price_history[-1])
+    # if HAS_INV == 1:
+    #     Stock_history.append(tuple([np.mean(raw_stock_history[-int(0.05 * T):, i]) for i in range(n)]))
+    #     print(Stock_history[-1])
+    # if DIFF_PL:
+    #     Platform_history.append(np.mean(raw_platform_history[-int(0.05 * T):, 0]))
+    #     Platform_actions.append(np.mean(raw_platform_history[-int(0.05 * T):, 1]))
+    #     print((Platform_history[-1], Platform_actions[-1]))
+    # if SHOW_PROM_RES:
+    #     print(Profit_history[-1])
+    #     print("-"*100)
+    #     print("\n")
+
+    # Price_history.append(tuple([raw_price_history[:, i] for i in range(n)]))
+    # Profit_history.append(tuple([raw_profit_history[:, i] for i in range(n)]))
+    # if SHOW_PROM_RES:
+    #     print("\n", [np.mean(Price_history[-1][i][-int(KNOWLEDGE_HORIZON):]) for i in range(2)])
+    # if HAS_INV == 1:
+    #     Stock_history.append(tuple([raw_stock_history[:, i] for i in range(n)]))
+    #     print([np.mean(Stock_history[-1][i][-int(KNOWLEDGE_HORIZON):]) for i in range(2)])
+    # if DIFF_PL:
+    #     Platform_history.append(raw_platform_history[:, 0])
+    #     Platform_actions.append(raw_platform_history[:, 1])
+    #     print((np.mean(Platform_history[-1][-int(KNOWLEDGE_HORIZON):]), np.mean(Platform_actions[-1][-int(KNOWLEDGE_HORIZON):])))
+    # if SHOW_PROM_RES:
+    #     print([np.mean(Profit_history[-1][i][-int(KNOWLEDGE_HORIZON):]) for i in range(2)])
+    #     print("-"*100)
+    #     print("\n")
+
+    path = os.path.join(res_name, f"Price_history_{env}.npy")
+    np.save(path, raw_price_history[- int(2 * KNOWLEDGE_HORIZON):])
+    path = os.path.join(res_name, f"Profit_history_{env}.npy")
+    np.save(path, raw_profit_history[- int(2 * KNOWLEDGE_HORIZON):])
+    if HAS_INV == 1:
+        path = os.path.join(res_name, f"Stock_history_{env}.npy")
+        np.save(path, raw_stock_history[- int(2 * KNOWLEDGE_HORIZON):])
+    if DIFF_PL:
+        path = os.path.join(res_name, f"Platform_history_{env}.npy")
+        np.save(path, raw_platform_history[- int(2 * KNOWLEDGE_HORIZON):]) #, 0
+        # path = os.path.join(res_name, f"Platform_actions_{env}.npy")
+        # np.save(path, raw_platform_history[- int(2 * KNOWLEDGE_HORIZON):, 1])
+    
+    Price_history.append(tuple([np.mean(raw_price_history[- int(KNOWLEDGE_HORIZON):, i]) for i in range(n)]))
+    Profit_history.append(tuple([np.mean(raw_profit_history[- int(KNOWLEDGE_HORIZON):, i]) for i in range(n)]))
     if SHOW_PROM_RES:
         print("\n", Price_history[-1])
     if HAS_INV == 1:
-        Stock_history.append(tuple([np.mean(raw_stock_history[-int(T/20):, i]) for i in range(n)]))
+        Stock_history.append(tuple([np.mean(raw_stock_history[- int(KNOWLEDGE_HORIZON):, i]) for i in range(n)]))
         print(Stock_history[-1])
     if DIFF_PL:
-        Platform_history.append(np.mean(raw_platform_history[-int(T/20):, 0]))
-        Platform_actions.append(np.mean(raw_platform_history[-int(T/20):, 1]))
+        Platform_history.append(np.mean(raw_platform_history[- int(KNOWLEDGE_HORIZON):, 0]))
+        Platform_actions.append(np.mean(raw_platform_history[- int(KNOWLEDGE_HORIZON):, 1]))
         print((Platform_history[-1], Platform_actions[-1]))
     if SHOW_PROM_RES:
         print(Profit_history[-1])
@@ -648,7 +716,7 @@ if VISUALIZE or SAVE:
     if T == 10**6:
         sgladit = int(10**4)
     else:
-        sgladit = int(0.05 * T)
+        sgladit = int(KNOWLEDGE_HORIZON)
     
     fig, ax = plt.subplots(1 + HAS_INV, 2 + (1 - HAS_INV) * int(profit_dynamic == "compare"), figsize= (20, 5*(1 + HAS_INV*1.1)))
 
@@ -825,19 +893,19 @@ if SUMMARY:
     Price_history = np.array(Price_history)
     Profit_history = np.array(Profit_history)
 
-    print(f"Средняя цена по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Price_history[:, i]), 3)) for i in range(n)]))
+    print(f"Средняя цена по последним {int(KNOWLEDGE_HORIZON)} раундов:", " ".join([str(round(np.mean(Price_history[:, i]), 3)) for i in range(n)]))
 
     if HAS_INV == 1:
         Stock_history = np.array(Stock_history)
-        print(f"Среднии запасы по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)]))
+        print(f"Среднии запасы по последним {int(KNOWLEDGE_HORIZON)} раундов:", " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)]))
 
     if DIFF_PL:
         Platform_history = np.array(Platform_history)
-        print(f"Средняя прибыль платформы по последним {int(T/20)} раундов:", str(round(np.mean(Platform_history), 3)))
+        print(f"Средняя прибыль платформы по последним {int(KNOWLEDGE_HORIZON)} раундов:", str(round(np.mean(Platform_history), 3)))
         Platform_history = np.array(Platform_history)
-        print(f"Средний коэфф. значимости цены для бустинга по последним {int(T/20)} раундов:", str(round(np.mean(Platform_actions), 3)))
+        print(f"Средний коэфф. значимости цены для бустинга по последним {int(KNOWLEDGE_HORIZON)} раундов:", str(round(np.mean(Platform_actions), 3)))
 
-    print(f"Средняя прибыль по последним {int(T/20)} раундов:", " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)]))
+    print(f"Средняя прибыль по последним {int(KNOWLEDGE_HORIZON)} раундов:", " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)]))
 
     print("-"*20*n)
     print("Теоретические цены:", round(p_NE , 3), round(p_M , 3))
@@ -879,17 +947,17 @@ if SAVE_SUMMARY or VISUALIZE:
             plt.savefig(plot_name, dpi = 1000)
     
     if SAVE_SUMMARY:
-        folders = []
-        num = Environment["folder_num"]
-        dest = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))) + "/simulation_results/"
-        for f in os.listdir(dest):
-            if not("." in str(f)) and (str(firms[0]) + "_" + num in str(f)):
-                folders.append(f)
+        # folders = []
+        # num = Environment["folder_num"]
+        # dest = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))) + "/simulation_results/"
+        # for f in os.listdir(dest):
+        #     if not("." in str(f)) and (str(firms[0]) + "_" + num in str(f)):
+        #         folders.append(f)
 
-        res_name = dest + f"/{str(firms[0])}_{num}_{len(folders) + 1}/"
+        # res_name = dest + f"/{str(firms[0])}_{num}_{len(folders) + 1}/"
 
-        if not os.path.exists(res_name):
-            os.makedirs(res_name)
+        # if not os.path.exists(res_name):
+        #     os.makedirs(res_name)
 
         with open(res_name + "params.txt", "w+", encoding="utf-8") as f:
             to_write = deepcopy(Environment)
@@ -898,34 +966,34 @@ if SAVE_SUMMARY or VISUALIZE:
             to_write = convert_ndarray_to_list(to_write)
             json.dump(to_write, f, indent=4)
         
-        path = os.path.join(res_name, "Price_history.npy")
-        np.save(path, Price_history)
-        path = os.path.join(res_name, "Profit_history.npy")
-        np.save(path, Profit_history)
-        if HAS_INV == 1:
-            path = os.path.join(res_name, "Stock_history.npy")
-            np.save(path, Stock_history)
-        if DIFF_PL:
-            path = os.path.join(res_name, "Platform_history.npy")
-            np.save(path, Platform_history)
-            path = os.path.join(res_name, "Platform_actions.npy")
-            np.save(path, Platform_actions)
+        # path = os.path.join(res_name, "Price_history.npy")
+        # np.save(path, Price_history)
+        # path = os.path.join(res_name, "Profit_history.npy")
+        # np.save(path, Profit_history)
+        # if HAS_INV == 1:
+        #     path = os.path.join(res_name, "Stock_history.npy")
+        #     np.save(path, Stock_history)
+        # if DIFF_PL:
+        #     path = os.path.join(res_name, "Platform_history.npy")
+        #     np.save(path, Platform_history)
+        #     path = os.path.join(res_name, "Platform_actions.npy")
+        #     np.save(path, Platform_actions)
 
         with open(res_name + "summary.txt", "w+", encoding="utf-8") as f:
             A = ""
-            A = A + f"Средняя цена по последним {int(T/20)} раундов: " + " ".join([str(round(np.mean(Price_history[:, i]), 3)) for i in range(n)])
+            A = A + f"Средняя цена по последним {int(KNOWLEDGE_HORIZON)} раундов: " + " ".join([str(round(np.mean(Price_history[:, i]), 3)) for i in range(n)])
             A = A + "\n"
             if HAS_INV == 1:
-                A = A + f"Среднии запасы по последним {int(T/20)} раундов: " + " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)])
+                A = A + f"Среднии запасы по последним {int(KNOWLEDGE_HORIZON)} раундов: " + " ".join([str(round(np.mean(Stock_history[:, i]), 3)) for i in range(n)])
                 A = A + "\n"
             
             if DIFF_PL:
-                A = A + f"Средняя прибыль платформы по последним {int(T/20)} раундов: " + str(round(np.mean(Platform_history), 3))
+                A = A + f"Средняя прибыль платформы по последним {int(KNOWLEDGE_HORIZON)} раундов: " + str(round(np.mean(Platform_history), 3))
                 A = A + "\n"
-                A = A + f"Средний коэфф. значимости цены для бустинга по последним {int(T/20)} раундов: " + str(round(np.mean(Platform_actions), 3))
+                A = A + f"Средний коэфф. значимости цены для бустинга по последним {int(KNOWLEDGE_HORIZON)} раундов: " + str(round(np.mean(Platform_actions), 3))
                 A = A + "\n"
 
-            A = A + f"Средняя прибыль по последним {int(T/20)} раундов: " + " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)])
+            A = A + f"Средняя прибыль по последним {int(KNOWLEDGE_HORIZON)} раундов: " + " ".join([str(round(np.mean(Profit_history[:, i]), 3)) for i in range(n)])
             A = A + "\n"
 
             if VISUALIZE_THEORY:

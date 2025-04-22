@@ -83,8 +83,8 @@ class demand_function:
 ### c_i, h^+, v^-, \eta
 
 e1 = {
-    "T": 200000,         # 100000, 200000
-    "ENV": 1,
+    "T": 100000,         # 100000, 200000
+    "ENV": 100,
     "n": 2,
     "m": 30,
     "delta": 0.95,      # 0.95, 0.99
@@ -126,7 +126,7 @@ e3 = {
     },
 }
 
-mode = "C" # C, D
+mode = "D" # C, D
 
 if mode == "D":
     prices = np.linspace(e2["p_inf"], e2["p_sup"], e2["arms_amo_price"])
@@ -169,28 +169,28 @@ ONLY_OWN = False
 ##########################
 ### PPO-D
 ##########################
-# assert mode == "D"
-# e4 = {
-#     "prices": prices,
-#     "inventory": inventory,
-#     "firm_model": PPO_D,
-#     "firm_params": {
-#         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
-#         "inventory_actions": inventory,
-#         "price_actions": prices,
-#         "batch_size": 128,          # 32, 64, 100, 128
-#         "N_epochs": 256,            # 100, 200, e1["T"]//100
-#         "epochs": 10,               # 25
-#         "gamma": e1["delta"],
-#         "actor_lr": 1.5 * 1e-4,
-#         "critic_lr": 1.5 * 1e-4,
-#         "clip_eps": 0.2,
-#         "lmbda": 1,
-#         "cuda_usage": False,
-#     },
-#     "MEMORY_VOLUME": MEMORY_VOLUME,
-#     "own": own,
-# }
+assert mode == "D"
+e4 = {
+    "prices": prices,
+    "inventory": inventory,
+    "firm_model": PPO_D,
+    "firm_params": {
+        "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+        "inventory_actions": inventory,
+        "price_actions": prices,
+        "batch_size": 128,          # 32, 64, 100, 128
+        "N_epochs": 256,            # 100, 200, e1["T"]//100
+        "epochs": 10,               # 25
+        "gamma": e1["delta"],
+        "actor_lr": 1.5 * 1e-4,
+        "critic_lr": 1.5 * 1e-4,
+        "clip_eps": 0.2,
+        "lmbda": 1,
+        "cuda_usage": False,
+    },
+    "MEMORY_VOLUME": MEMORY_VOLUME,
+    "own": own,
+}
 ##########################
 ### PPO-C
 ##########################
@@ -219,31 +219,31 @@ ONLY_OWN = False
 ##########################
 ### SAC
 ##########################
-assert mode == "C"
-e4 = {
-    "prices": prices,
-    "inventory": inventory,
-    "firm_model": SAC,
-    "firm_params": {
-        "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
-        "inventory_actions": inventory,
-        "price_actions": prices,
-        "batch_size": 100,         # 32, 64, 100, 128
-        "N_epochs": 100,           # 100, 200, e1["T"]//100
-        "epochs": 1,
-        "MC_samples": 200,
-        "gamma": e1["delta"],
-        "actor_lr": 3e-4,
-        "critic_lr": 3e-4,
-        "alpha_lr": 3e-4,
-        "target_entropy": -2,
-        "target_scaling": 1,
-        "tau": 0.05,
-        "cuda_usage": False,
-    },
-    "MEMORY_VOLUME": MEMORY_VOLUME,
-    "own": own,
-}
+# assert mode == "C"
+# e4 = {
+#     "prices": prices,
+#     "inventory": inventory,
+#     "firm_model": SAC,
+#     "firm_params": {
+#         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+#         "inventory_actions": inventory,
+#         "price_actions": prices,
+#         "batch_size": 100,         # 32, 64, 100, 128
+#         "N_epochs": 100,           # 100, 200, e1["T"]//100
+#         "epochs": 1,
+#         "MC_samples": 200,
+#         "gamma": e1["delta"],
+#         "actor_lr": 3e-4,
+#         "critic_lr": 3e-4,
+#         "alpha_lr": 3e-4,
+#         "target_entropy": -2,
+#         "target_scaling": 1,
+#         "tau": 0.05,
+#         "cuda_usage": False,
+#     },
+#     "MEMORY_VOLUME": MEMORY_VOLUME,
+#     "own": own,
+# }
 ##########################
 ### No platform
 ##########################
@@ -303,14 +303,14 @@ Environment = e1 | e2 | e3 | e4 | e5
 # Price_history = []
 # Profit_history = []
 # Stock_history = []
-# GENERAL_RES = "SAC"
+# GENERAL_RES = "PPO_D"
 # num = "2"
 # DIFF_PL = (num == "2")
 # if DIFF_PL:
 #     Platform_history = []
 #     Platform_actions = []
 
-# for i in range(1, 8 + 1):
+# for i in range(1, 1 + 1):
 #     folder_name = f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_{i}/"
 #     a1, a2, a3 = np.load(folder_name + "Price_history.npy"), np.load(folder_name + "Profit_history.npy"), np.load(folder_name + "Stock_history.npy")
 #     if DIFF_PL:
@@ -319,6 +319,27 @@ Environment = e1 | e2 | e3 | e4 | e5
 #     Price_history = Price_history + a1.tolist()
 #     Profit_history = Profit_history + a2.tolist()
 #     Stock_history = Stock_history + a3.tolist()
+
+# for i in range(1, 1 + 1):
+#     folder_name = f"./DRL_pricing/environment/simulation_results/{GENERAL_RES}_{num}_{i}/"
+#     num = -1
+#     for filename in os.listdir(folder_name):
+#         if filename.endswith(".npy"):
+#             num = max(num, int(filename[filename.rfind("_") + 1:filename.find(".npy")]))
+#     for j in range(num + 1):
+#         a1, a2, a3 = np.load(folder_name + f"Price_history_{j}.npy").T, np.load(folder_name + f"Profit_history_{j}.npy").T, np.load(folder_name + f"Stock_history_{j}.npy").T
+#         if DIFF_PL:
+#             Platform_history = Platform_history + [np.load(folder_name + f"Platform_history_{j}.npy")[:, 0]]
+#             Platform_actions = Platform_actions + [np.load(folder_name + f"Platform_history_{j}.npy")[:, 1]]
+#         Price_history = Price_history + [a1]
+#         Profit_history = Profit_history + [a2]
+#         Stock_history = Stock_history + [a3]
+
+# Price_history = np.array(Stock_history)
+
+# plt.plot(np.mean(Price_history[:, 0, :], axis = 0))
+# plt.plot(np.mean(Price_history[:, 1, :], axis = 0))
+# plt.show()
 
 # Price_history = np.array(Price_history[:200])
 # Profit_history = np.array(Profit_history[:200])
@@ -336,6 +357,11 @@ Environment = e1 | e2 | e3 | e4 | e5
 
 # # counts, bins = np.histogram(Platform_history)
 # # counts = counts / len(Platform_history)
+# # plt.hist(bins[:-1], bins, weights=counts, color = "#8B8B83")
+# # plt.show()
+
+# # counts, bins = np.histogram(Platform_actions)
+# # counts = counts / len(Platform_actions)
 # # plt.hist(bins[:-1], bins, weights=counts, color = "#8B8B83")
 # # plt.show()
 

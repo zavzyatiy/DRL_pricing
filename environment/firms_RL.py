@@ -322,13 +322,13 @@ class DQNet(nn.Module):
     def __init__(self, input_dim, inventory_actions, price_actions):
         super().__init__()
         
-        sloy = 256
+        sloy = 256 # 256
         
         self.online = nn.Sequential(
             nn.Linear(input_dim, sloy),
-            nn.ReLU(),
+            nn.ELU(), # nn.ReLU(),
             nn.Linear(sloy, sloy),
-            nn.ReLU(),
+            nn.ELU(), # nn.ReLU(),
         )
 
         self.inventory_size = len(inventory_actions)
@@ -560,9 +560,9 @@ class PPO_D_ActorNet(nn.Module):
         
         self.d_actor_net = nn.Sequential(
             nn.Linear(input_dim, sloy),
-            nn.ReLU(),
+            nn.ELU(), # nn.ReLU(),
             nn.Linear(sloy, sloy),
-            nn.ReLU(),
+            nn.ELU(), # nn.ReLU(),
         )
 
         self.inventory_size = len(inventory_actions)
@@ -587,9 +587,9 @@ class PPO_D_CriticNet(nn.Module):
         
         self.d_critic_net = nn.Sequential(
             nn.Linear(input_dim, sloy),
-            nn.ReLU(),
+            nn.ELU(), # nn.ReLU(),
             nn.Linear(sloy, sloy),
-            nn.ReLU(),
+            nn.ELU(), # nn.ReLU(),
             nn.Linear(sloy, 1)
             )
 
@@ -825,11 +825,11 @@ class PPO_C_ActorNet(nn.Module):
         
         self.c_actor_net = nn.Sequential(
             nn.Linear(input_dim, sloy),
-            nn.LayerNorm(sloy),
-            nn.ReLU(),
+            # nn.LayerNorm(sloy),
+            nn.ELU(), # nn.ReLU(),
             nn.Linear(sloy, sloy),
-            nn.LayerNorm(sloy),
-            nn.ReLU(),
+            # nn.LayerNorm(sloy),
+            nn.ELU(), # nn.ReLU(),
         )
 
         self.inventory_head_mu = nn.Linear(sloy, 1)
@@ -860,11 +860,11 @@ class PPO_C_CriticNet(nn.Module):
         
         self.c_critic_net = nn.Sequential(
             nn.Linear(input_dim, sloy),
-            nn.LayerNorm(sloy),
-            nn.ReLU(),
+            # nn.LayerNorm(sloy),
+            nn.ELU(), # nn.ReLU(),
             nn.Linear(sloy, sloy),
-            nn.LayerNorm(sloy),
-            nn.ReLU(),
+            # nn.LayerNorm(sloy),
+            nn.ELU(), # nn.ReLU(),
             nn.Linear(sloy, 1)
             )
 
@@ -1114,11 +1114,11 @@ class SAC_ActorNet(nn.Module):
         
         self.actor = nn.Sequential(
             nn.Linear(input_dim, sloy),
-            nn.LayerNorm(sloy),
-            nn.ReLU(),
+            # nn.LayerNorm(sloy),
+            nn.ELU(), # nn.ReLU(),
             nn.Linear(sloy, sloy),
-            nn.LayerNorm(sloy),
-            nn.ReLU(),
+            # nn.LayerNorm(sloy),
+            nn.ELU(), # nn.ReLU(),
         )
 
         self.inventory_head_mu = nn.Linear(sloy, 1)
@@ -1149,11 +1149,11 @@ class SAC_CriticNet_Q(nn.Module):
         
         self.net = nn.Sequential(
             nn.Linear(input_dim + action_dim, sloy),
-            nn.LayerNorm(sloy),
-            nn.ReLU(),
+            # nn.LayerNorm(sloy),
+            nn.ELU(), # nn.ReLU(),
             nn.Linear(sloy, sloy),
-            nn.LayerNorm(sloy),
-            nn.ReLU(),
+            # nn.LayerNorm(sloy),
+            nn.ELU(), # nn.ReLU(),
             nn.Linear(sloy, 1)
             )
 
