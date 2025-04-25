@@ -14,39 +14,33 @@ from copy import deepcopy
 
 from specification import Environment, demand_function
 
+DOWNLOAD_IN_TEX = False
 SHOW = False
 CREATE = False
 SQUEEZE = False
 KS = False
-SPLASH = True
+SPLASH = False
+PARI = False
+SIBLINGS = False
 pl_list = ["None", "fixed" ,"dynamic"]
-num = "1"
-GENERAL_RES = "PPO_C"
-files_amo = 3
+num = "2"
+GENERAL_RES = "TN_DDQN"
+files_amo = 6
 platform = pl_list[int(num)]
 DIFF_PL = (num == "2")
 files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
 files = [x.replace("_0", f"_{num}_0") for x in files]
 names = ["TN-DDQN", "PPO-D", "PPO-C", "SAC"]
 
-start_collusion = """\\bgroup
-\def\arraystretch{1.25}
-\begin{table}[H]
-\caption{Индексы сговора (по усред. последним 5\% итераций)}
-\label{tables:platforms_None}
-\begin{center}"""
+start_collusion = "\\bgroup\n\\def\\arraystretch{1.25}\n\\begin{table}[H]\n\t\\caption{Индексы сговора (по усред. последним 5\\% итераций)}\n\t\\label{tables:platforms_"
+start_collusion = start_collusion + pl_list[int(num)] + "}\n\t\\begin{center}\n\t\t\\vspace{-0.5em}\n\t\t\\begin{tabular}{c||ccc}\n\t\t\t\\toprule"
 
-# \caption{Расчетные статистики теста Колмогорова-Смирнова согласованности распределений параметров равновесия по 5\% последних итераций}
-start_ks = """\\bgroup
-\def\arraystretch{1.25}
-\begin{table}[H]
-\caption{Расчетные статистики U-теста для распределений параметров равновесия по 5\% последних итераций}
-\label{tables:ks_fixed}
-\begin{center}"""
-
-end_collusion = """\end{center}
-\end{table}
-\egroup"""
+# \caption{Расчетные статистики теста Колмогорова-Смирнова согласованности распределений параметров равновесия по 5\\% последних итераций}
+start_ks = "\\bgroup\n\\def\\arraystretch{1.25}\n\\begin{table}[H]\n\t\\caption{Расчетные статистики U-теста для распределений параметров равновесия по 5\\% последних итераций}\n\t\\label{tables:U_"
+start_ks = start_ks + pl_list[int(num)] + "}\n\t\\begin{center}\n\t\t\\vspace{-0.5em}\n\t\t\\begin{tabular}{c||ccc}\n\t\t\t\\toprule"
+end_collusion = "\t\\end{center}\n\\end{table}\n\\egroup"
+plat_tex = ["\\makecell{Алгоритм плат-\\\\ формы: $\\mathcal{K}_t \\equiv 0$}", "\\makecell{Алгоритм плат-\\\\ формы: $\\alpha_t = \\frac{1}{3}$}", "\\makecell{Алгоритм плат-\\\\ формы: PPO-D}"]
+end_collusion = "\t\t\t\\bottomrule\n\t\t\\end{tabular}\n" + end_collusion
 
 if SPLASH:
 
@@ -209,14 +203,14 @@ if KS:
             elif (d.pvalue >= 0.1):
                 a = d
                 sign = "0"
-            if i in [0] and j == 0:
-                print(b.pvalue, c.pvalue, d.pvalue)
-                res1 = stats.ecdf(data_new[i][j].flatten())
-                res2 = stats.ecdf(data_old[i][j].flatten())
-                ax = plt.subplot()
-                res1.cdf.plot(ax, color = "blue")
-                res2.cdf.plot(ax, color = "orange")
-                plt.show()
+            # if i in [0] and j == 0:
+            #     print(b.pvalue, c.pvalue, d.pvalue)
+            #     res1 = stats.ecdf(data_new[i][j].flatten())
+            #     res2 = stats.ecdf(data_old[i][j].flatten())
+            #     ax = plt.subplot()
+            #     res1.cdf.plot(ax, color = "blue")
+            #     res2.cdf.plot(ax, color = "orange")
+            #     plt.show()
             dots = "*" * int(a.pvalue < 0.1)  + "*" * int(a.pvalue < 0.05)  + "*" * int(a.pvalue < 0.01)
             text = "$"* int(len(dots) > 0) + str(round(a.statistic, 2)) + ("^{" + dots + "}") * int(len(dots) > 0)
             text = "\makecell[c]{ " + text + ("_{" + sign + "} $") * int(len(dots) > 0) +"\\\\[1ex] }" # + (" \\\\ (" + sign + ") ") * int(len(dots) > 0)
@@ -226,8 +220,11 @@ if KS:
     # df.columns=["$KS_{price}$", "$KS_{inv}$", "$KS_{\pi}$"]
     df.columns=["$U_{price}$", "$U_{inv}$", "$U_{\pi}$"]
     print(start_ks)
-    print(df.to_latex())
+    A = df.to_latex()
+    A = "\n".join(["\t\t\t" + x for x in (plat_tex[int(num)] + "\n".join(A.split("\n")[2:-3])).split("\n")])
+    print(A)
     print(end_collusion)
+    print("\n")
 
 
 if CREATE:
@@ -240,8 +237,11 @@ if CREATE:
     df = pd.DataFrame(dic).T
     df.columns=["$\Delta_{price}$", "$\Delta_{inv}$", "$\Delta_{\pi}$"]
     print(start_collusion)
-    print(df.to_latex())
+    A = df.to_latex()
+    A = "\n".join(["\t\t\t" + x for x in (plat_tex[int(num)] + "\n".join(A.split("\n")[2:-3])).split("\n")])
+    print(A)
     print(end_collusion)
+    print("\n")
 
 
 if SHOW:
@@ -455,4 +455,75 @@ if SQUEEZE:
 
         plt.show()
 
+
+if PARI:
+    
+    Price_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy") for x in files]
+    Profit_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Profit_history.npy") for x in files]
+    Stock_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Stock_history.npy") for x in files]
+    data = [Price_list, Stock_list, Profit_list]
+    data_naming = ["цен", "инвестиций в запасы", "прибылей"]
+    data_labeling = ["p", "y", "pi"]
+
+    if DIFF_PL:
+        Platform_actions = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Platform_actions.npy") for x in files]
+        Platform_history = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Platform_history.npy") for x in files]
+        data = data + [Platform_actions, Platform_history]
+        data_naming = data_naming + ["коэфф. бустинга", "прибыли платформы"]
+        data_labeling = data_labeling + ["alpha", "pi_plat"]
+
+    for idx in range(len(data)):
+        mas = data[idx]
+        dic = {names[i]:[] for i in range(len(files) - 1)}
+
+        start_ks_pari = "\\bgroup\n\def\arraystretch{1.25}\n\\begin{table}[H]\n\t\caption{Расчетные статистики U-теста для распределений "
+        start_ks_pari = start_ks_pari + data_naming[idx] + " в равновесии по 5\\% последних итераций}\n\t\label{tables:ks_"
+        start_ks_pari = start_ks_pari + pl_list[int(num)] + ":" + data_labeling[idx]
+        start_ks_pari = start_ks_pari + "}\n\t\\begin{center}\n\t\t\\vspace{-0.5em}\n\t\t\\begin{tabular}{c||cccc}\n\t\t\t\\toprule"
+
+        for i in range(len(files) - 1):
+            for j in range(len(files)):
+                if j < i + 1:
+                    text = " "
+                    dic[names[i]].append(text)
+                    continue
+                # a = stats.ks_2samp(data_new[i][j].flatten(), data_old[i][j].flatten())
+                b = stats.mannwhitneyu(mas[i].flatten(), mas[j].flatten(), alternative='less')
+                c = stats.mannwhitneyu(mas[i].flatten(), mas[j].flatten(), alternative="greater")
+                d = stats.mannwhitneyu(mas[i].flatten(), mas[j].flatten(), alternative="two-sided")
+                if (d.pvalue < 0.1) and (b.pvalue < c.pvalue):
+                    a = b
+                    sign = "<"
+                elif (d.pvalue < 0.1) and (b.pvalue > c.pvalue):
+                    a = c
+                    sign = ">"
+                elif (d.pvalue >= 0.1):
+                    a = d
+                    sign = "0"
+                # if i in [0] and j == 2:
+                #     print(b.pvalue, c.pvalue, d.pvalue)
+                #     res1 = stats.ecdf(mas[i].flatten())
+                #     res2 = stats.ecdf(mas[j].flatten())
+                #     ax = plt.subplot()
+                #     res1.cdf.plot(ax, color = "blue")
+                #     res2.cdf.plot(ax, color = "orange")
+                #     plt.show()
+                dots = "*" * int(a.pvalue < 0.1)  + "*" * int(a.pvalue < 0.05)  + "*" * int(a.pvalue < 0.01)
+                text = "$"* int(len(dots) > 0) + str(round(a.statistic, 2)) + ("^{" + dots + "}") * int(len(dots) > 0)
+                text = "\makecell[c]{ " + text + ("_{" + sign + "} $") * int(len(dots) > 0) +"\\\\[1ex] }" # + (" \\\\ (" + sign + ") ") * int(len(dots) > 0)
+                dic[names[i]].append(text)
+        
+        df = pd.DataFrame(dic).T
+        # df.columns=["$KS_{price}$", "$KS_{inv}$", "$KS_{\pi}$"]
+        df.columns=names
+        print(start_ks_pari)
+        A = df.to_latex()
+        A = "\n".join(["\t\t\t" + x for x in (plat_tex[int(num)] + "\n".join(A.split("\n")[2:-3])).split("\n")])
+        print(A)
+        print(end_collusion)
+        print("\n")
+
+
+if SIBLINGS:
+    pass
 

@@ -1,0 +1,85 @@
+{
+    "T": 200000,
+    "ENV": 200 ### Из-за ограничений по мощностям усреднение было таким: {"ENV": 42 , "RANDOM_SEED": 10}, {"ENV": 101 , "RANDOM_SEED": 32}, {"ENV": 103 , "RANDOM_SEED": 37}, {"ENV": 23 , "RANDOM_SEED": 60}, {"ENV": 107 , "RANDOM_SEED": 44}, {"ENV": 57 , "RANDOM_SEED": 6}, {"ENV": 98 , "RANDOM_SEED": 5}, {"ENV": 65 , "RANDOM_SEED": 6}
+    "n": 2,
+    "m": 30,
+    "delta": 0.95,
+    "gamma": 0.1,
+    "theta_d": 0.043,
+    "c_i": 1,
+    "h_plus": 3,
+    "v_minus": 3,
+    "eta": 0.05,
+    "color": [
+        "#FF7F00",
+        "#1874CD",
+        "#548B54",
+        "#CD2626",
+        "#CDCD00"
+    ],
+    "profit_dynamic": "compare",
+    "loc": "lower left",
+    "VISUALIZE_THEORY": true,
+    "VISUALIZE": true,
+    "SAVE": true,
+    "SUMMARY": true,
+    "SHOW_PROM_RES": true,
+    "SAVE_SUMMARY": true,
+    "RANDOM_SEED": 42,
+    "p_inf": 1.1588888888888889,
+    "p_sup": 2.658888888888889,
+    "arms_amo_price": 101,
+    "arms_amo_inv": 101,
+    "demand_params": {
+        "n": 2,
+        "mode": "logit",
+        "a": 2.158888888888889,
+        "mu": 0.25,
+        "C": 36
+    },
+    "prices": [
+        1.1588888888888889,
+        2.658888888888889
+    ],
+    "inventory": [
+        0,
+        36
+    ],
+    "firm_model": "SAC",
+    "firm_params": {
+        "state_dim": 2,
+        "inventory_actions": [
+            0,
+            36
+        ],
+        "price_actions": [
+            1.1588888888888889,
+            2.658888888888889
+        ],
+        "batch_size": 100,
+        "N_epochs": 100,
+        "epochs": 1,
+        "MC_samples": 200,
+        "gamma": 0.95,
+        "actor_lr": 0.0003,
+        "critic_lr": 0.0003,
+        "alpha_lr": 0.0003,
+        "target_entropy": -2,
+        "target_scaling": 1,
+        "tau": 0.05,
+        "cuda_usage": false
+    },
+    "MEMORY_VOLUME": 1,
+    "own": false,
+    "folder_num": "1",
+    "PLATFORM": true,
+    "plat_model": "fixed_weights",
+    "plat_params": {
+        "weight": 0.3333333333333333,
+        "memory_size": 30,
+        "n": 2,
+        "p_inf": 1.1588888888888889,
+        "p_max": 2.658888888888889,
+        "C": 36
+    }
+}

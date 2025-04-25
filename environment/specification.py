@@ -84,7 +84,7 @@ class demand_function:
 
 e1 = {
     "T": 100000,         # 100000, 200000
-    "ENV": 200,
+    "ENV": 15,
     "n": 2,
     "m": 30,
     "delta": 0.95,      # 0.95, 0.99
@@ -103,7 +103,7 @@ e1 = {
     "SUMMARY": True,
     "SHOW_PROM_RES": True,
     "SAVE_SUMMARY": True,
-    "RANDOM_SEED": 42,
+    "RANDOM_SEED": 34,
 }
 
 # Это чтобы я случайно не потерял все результаты симуляций
@@ -142,55 +142,55 @@ ONLY_OWN = False
 ##########################
 ### TN_DDQN
 ##########################
-# assert mode == "D"
-# e4 = {
-#     "prices": prices,
-#     "inventory": inventory,
-#     "firm_model": TN_DDQN,
-#     "firm_params": {
-#         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
-#         "inventory_actions": inventory,
-#         "price_actions": prices,
-#         "MEMORY_VOLUME": MEMORY_VOLUME,
-#         "batch_size": 32, # 32
-#         "gamma": e1["delta"],
-#         "lr": 0.0001,
-#         "eps": 0.4,
-#         "mode": "zhou", # None, "sanchez_cartas", "zhou"
-#         "target_update_freq": 100, # e1["T"]//100, 100
-#         "memory_size": 1000, # 10000
-#         "cuda_usage": True,
-#         "eps_min": 0.01,
-#         "eps_max": 1,
-#         "beta": 1.5/(10**4),
-#     },
-#     "own": own,
-# }
-##########################
-### PPO-D
-##########################
 assert mode == "D"
 e4 = {
     "prices": prices,
     "inventory": inventory,
-    "firm_model": PPO_D,
+    "firm_model": TN_DDQN,
     "firm_params": {
         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
         "inventory_actions": inventory,
         "price_actions": prices,
-        "batch_size": 128,          # 32, 64, 100, 128
-        "N_epochs": 256,            # 100, 200, e1["T"]//100
-        "epochs": 10,               # 25
+        "MEMORY_VOLUME": MEMORY_VOLUME,
+        "batch_size": 32, # 32
         "gamma": e1["delta"],
-        "actor_lr": 1.5 * 1e-4,
-        "critic_lr": 1.5 * 1e-4,
-        "clip_eps": 0.2,
-        "lmbda": 1,
-        "cuda_usage": False,
+        "lr": 0.0001,
+        "eps": 0.4,
+        "mode": "zhou", # None, "sanchez_cartas", "zhou"
+        "target_update_freq": 100, # e1["T"]//100, 100
+        "memory_size": 1000, # 10000
+        "cuda_usage": True,
+        "eps_min": 0.01,
+        "eps_max": 1,
+        "beta": 1.5/(10**4),
     },
-    "MEMORY_VOLUME": MEMORY_VOLUME,
     "own": own,
 }
+##########################
+### PPO-D
+##########################
+# assert mode == "D"
+# e4 = {
+#     "prices": prices,
+#     "inventory": inventory,
+#     "firm_model": PPO_D,
+#     "firm_params": {
+#         "state_dim": 1 + MEMORY_VOLUME * (e1["n"] - (1 - int(own))),
+#         "inventory_actions": inventory,
+#         "price_actions": prices,
+#         "batch_size": 128,          # 32, 64, 100, 128
+#         "N_epochs": 256,            # 100, 200, e1["T"]//100
+#         "epochs": 10,               # 25
+#         "gamma": e1["delta"],
+#         "actor_lr": 1.5 * 1e-4,
+#         "critic_lr": 1.5 * 1e-4,
+#         "clip_eps": 0.2,
+#         "lmbda": 1,
+#         "cuda_usage": False,
+#     },
+#     "MEMORY_VOLUME": MEMORY_VOLUME,
+#     "own": own,
+# }
 ##########################
 ### PPO-C
 ##########################
