@@ -1,0 +1,20 @@
+\bgroup
+\def\arraystretch{1.25}
+\begin{table}[H]
+	\caption{Расчетные статистики U-теста для распределений параметров равновесия по 5\% последних итераций}
+	\label{tables:U_fixed}
+	\begin{center}
+		\vspace{-0.5em}
+		\begin{tabular}{c||ccc}
+			\toprule
+			\makecell{Алгоритм плат-\\ формы: $\alpha_t = \frac{1}{3}$} & $U_{price}$ & $U_{inv}$ & $U_{\pi}$ \\
+			\midrule
+			TN-DDQN & \makecell[c]{ 85351.0\\[1ex] } & \makecell[c]{ 79533.0\\[1ex] } & \makecell[c]{ 74984.0\\[1ex] } \\
+			PPO-D & \makecell[c]{ 80858.5\\[1ex] } & \makecell[c]{ 77724.0\\[1ex] } & \makecell[c]{ 74648.0\\[1ex] } \\
+			PPO-C & \makecell[c]{ $67393.0^{***}_{<} $\\[1ex] } & \makecell[c]{ $91117.0^{***}_{>} $\\[1ex] } & \makecell[c]{ $65550.0^{***}_{<} $\\[1ex] } \\
+			SAC & \makecell[c]{ 79277.0\\[1ex] } & \makecell[c]{ $63785.0^{***}_{<} $\\[1ex] } & \makecell[c]{ $30351.0^{***}_{<} $\\[1ex] } \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+\end{table}
+\egroup

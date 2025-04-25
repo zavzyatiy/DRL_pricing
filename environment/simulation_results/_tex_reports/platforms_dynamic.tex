@@ -1,0 +1,20 @@
+\bgroup
+\def\arraystretch{1.25}
+\begin{table}[H]
+	\caption{Расчетные статистики U-теста для распределений параметров равновесия по 5\% последних итераций}
+	\label{tables:U_dynamic}
+	\begin{center}
+		\vspace{-0.5em}
+		\begin{tabular}{c||ccc}
+			\toprule
+			\makecell{Алгоритм плат-\\ формы: PPO-D} & $\Delta_{price}$ & $\Delta_{inv}$ & $\Delta_{\pi}$ \\
+			\midrule
+			TN-DDQN & 15.63\% & 13.88\% & -61.39\% \\
+			PPO-D & 93.61\% & 119.0\% & -25.73\% \\
+			PPO-C & 34.48\% & -16.22\% & -207.26\% \\
+			SAC & 207.75\% & 325.86\% & -96.28\% \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+\end{table}
+\egroup

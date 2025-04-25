@@ -11,16 +11,17 @@ import pandas as pd
 from scipy import stats
 import json
 from copy import deepcopy
+import inspect, os
 
 from specification import Environment, demand_function
 
-DOWNLOAD_IN_TEX = False
+DOWNLOAD_IN_TEX = True
 SHOW = False
 CREATE = False
 SQUEEZE = False
 KS = False
 SPLASH = False
-PARI = False
+PARI = True
 SIBLINGS = False
 pl_list = ["None", "fixed" ,"dynamic"]
 num = "2"
@@ -178,6 +179,15 @@ if KS:
     data = np.array([Price_zero, Stock_zero, Profit_zero])
     data_old = data.transpose(1, 0, 2, 3)
 
+    if DIFF_PL:
+        files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
+        files = [x.replace("_0", "_1_0") for x in files]
+        Price_zero = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy") for x in files]
+        Profit_zero = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Profit_history.npy") for x in files]
+        Stock_zero = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Stock_history.npy") for x in files]
+        data = np.array([Price_zero, Stock_zero, Profit_zero])
+        data_not_so_old = data.transpose(1, 0, 2, 3)
+
     files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
     files = [x.replace("_0", f"_{num}_0") for x in files]
     Price_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy") for x in files]
@@ -213,18 +223,42 @@ if KS:
             #     plt.show()
             dots = "*" * int(a.pvalue < 0.1)  + "*" * int(a.pvalue < 0.05)  + "*" * int(a.pvalue < 0.01)
             text = "$"* int(len(dots) > 0) + str(round(a.statistic, 2)) + ("^{" + dots + "}") * int(len(dots) > 0)
-            text = "\makecell[c]{ " + text + ("_{" + sign + "} $") * int(len(dots) > 0) +"\\\\[1ex] }" # + (" \\\\ (" + sign + ") ") * int(len(dots) > 0)
+            text = "\makecell[c]{ " + text + ("_{" + sign + "} $") * int(len(dots) > 0) +"\\\\" + (1 - int(DIFF_PL)) * "[1ex] }"
+            if DIFF_PL:
+                b = stats.mannwhitneyu(data_new[i][j].flatten(), data_not_so_old[i][j].flatten(), alternative='less')
+                c = stats.mannwhitneyu(data_new[i][j].flatten(), data_not_so_old[i][j].flatten(), alternative="greater")
+                d = stats.mannwhitneyu(data_new[i][j].flatten(), data_not_so_old[i][j].flatten(), alternative="two-sided")
+                if (d.pvalue < 0.1) and (b.pvalue < c.pvalue):
+                    a = b
+                    sign = "<"
+                elif (d.pvalue < 0.1) and (b.pvalue > c.pvalue):
+                    a = c
+                    sign = ">"
+                elif (d.pvalue >= 0.1):
+                    a = d
+                    sign = "0"
+                
+                dots = "*" * int(a.pvalue < 0.1)  + "*" * int(a.pvalue < 0.05)  + "*" * int(a.pvalue < 0.01)
+                append_text = "$"* int(len(dots) > 0) + str(round(a.statistic, 2)) + ("^{" + dots + "}") * int(len(dots) > 0)
+                text = text + " " + append_text + ("_{" + sign + "} $") * int(len(dots) > 0) +"\\\\[1ex] }"
             dic[names[i]].append(text)
     
     df = pd.DataFrame(dic).T
     # df.columns=["$KS_{price}$", "$KS_{inv}$", "$KS_{\pi}$"]
     df.columns=["$U_{price}$", "$U_{inv}$", "$U_{\pi}$"]
-    print(start_ks)
     A = df.to_latex()
     A = "\n".join(["\t\t\t" + x for x in (plat_tex[int(num)] + "\n".join(A.split("\n")[2:-3])).split("\n")])
+
+    print(start_ks)
     print(A)
     print(end_collusion)
     print("\n")
+
+    if DOWNLOAD_IN_TEX:
+        dest = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))) + "/simulation_results/_tex_reports/"
+        naming = "platform_U_" + platform + ".tex"
+        with open(dest + naming, "w+", encoding = "utf-8") as f:
+            f.write(start_ks + "\n" + A + "\n" + end_collusion)
 
 
 if CREATE:
@@ -236,12 +270,19 @@ if CREATE:
         dic[names[i]] = mas
     df = pd.DataFrame(dic).T
     df.columns=["$\Delta_{price}$", "$\Delta_{inv}$", "$\Delta_{\pi}$"]
-    print(start_collusion)
     A = df.to_latex()
     A = "\n".join(["\t\t\t" + x for x in (plat_tex[int(num)] + "\n".join(A.split("\n")[2:-3])).split("\n")])
+
+    print(start_collusion)
     print(A)
     print(end_collusion)
     print("\n")
+
+    if DOWNLOAD_IN_TEX:
+        dest = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))) + "/simulation_results/_tex_reports/"
+        naming = "platforms_" + platform + ".tex"
+        with open(dest + naming, "w+", encoding = "utf-8") as f:
+            f.write(start_ks + "\n" + A + "\n" + end_collusion)
 
 
 if SHOW:
@@ -457,7 +498,6 @@ if SQUEEZE:
 
 
 if PARI:
-    
     Price_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy") for x in files]
     Profit_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Profit_history.npy") for x in files]
     Stock_list = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Stock_history.npy") for x in files]
@@ -523,7 +563,19 @@ if PARI:
         print(end_collusion)
         print("\n")
 
+        # print(start_collusion)
+        # print(A)
+        # print(end_collusion)
+        # print("\n")
+
+        # if DOWNLOAD_IN_TEX:
+        #     dest = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))) + "/simulation_results/_tex_reports/"
+        #     naming = "platforms_" + platform + ".tex"
+        #     with open(dest + naming, "w+", encoding = "utf-8") as f:
+        #         f.write(start_ks + "\n" + A + "\n" + end_collusion)
+
 
 if SIBLINGS:
+    
     pass
 

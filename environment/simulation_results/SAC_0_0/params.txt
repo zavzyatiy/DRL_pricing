@@ -72,5 +72,6 @@
     "MEMORY_VOLUME": 1,
     "own": false,
     "PLATFORM": false,
+    "plat_model": "None",
     "plat_params": {}
 }
