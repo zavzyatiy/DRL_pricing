@@ -1,0 +1,19 @@
+\bgroup
+\def\arraystretch{1.25}
+\begin{table}[H]
+	\caption{Расчетные статистики U-теста для распределений цен, инвестиций в запасы, прибылей в равновесии по последним 5\% итераций}
+	\label{tables:ks_fixed:p_y_pi}
+	\begin{center}
+		\vspace{-0.5em}
+		\begin{tabular}{c||cccc}
+			\toprule
+			\makecell{Алгоритм плат-\\ формы: $\alpha_t = \frac{1}{3}$} & TN-DDQN & PPO-D & PPO-C & SAC \\
+			\midrule
+			TN-DDQN & \makecell[c]{ \\[1ex] } & \makecell[c]{ $7723.0^{***}_{<} $\\$121841.0^{***}_{>} $\\$53542.0^{***}_{<} $\\[1ex] } & \makecell[c]{ $33245.0^{***}_{<} $\\$67900.0^{***}_{<} $\\$97363.0^{***}_{>} $\\[1ex] } & \makecell[c]{ $0.0^{***}_{<} $\\$160000.0^{***}_{>} $\\$106567.0^{***}_{>} $\\[1ex] } \\
+			PPO-D & \makecell[c]{ \\[1ex] } & \makecell[c]{ \\[1ex] } & \makecell[c]{ $139390.0^{***}_{>} $\\$28633.0^{***}_{<} $\\$116571.0^{***}_{>} $\\[1ex] } & \makecell[c]{ $1635.0^{***}_{<} $\\$154418.0^{***}_{>} $\\$119130.0^{***}_{>} $\\[1ex] } \\
+			PPO-C & \makecell[c]{ \\[1ex] } & \makecell[c]{ \\[1ex] } & \makecell[c]{ \\[1ex] } & \makecell[c]{ $0.0^{***}_{<} $\\$160000.0^{***}_{>} $\\$72689.0^{**}_{<} $\\[1ex] } \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+\end{table}
+\egroup

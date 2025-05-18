@@ -4,6 +4,7 @@
 ### для докера: pip freeze > requirements.txt
 
 import matplotlib.pyplot as plt
+import seaborn as sns
 import numpy as np
 import os
 import matplotlib.gridspec as gridspec
@@ -15,15 +16,17 @@ import inspect, os
 
 from specification import Environment, demand_function
 
-DOWNLOAD_IN_TEX = True
+DOWNLOAD_IN_TEX = False
 SHOW = False
-CREATE = False
+CREATE = True
 SQUEEZE = False
 KS = False
 SPLASH = False
-PARI = True
+PARI = False
 SIBLINGS = False
 pl_list = ["None", "fixed" ,"dynamic"]
+plat_tex = ["\\makecell{Алгоритм плат-\\\\ формы: $\\mathcal{K}_t \\equiv 0$}", "\\makecell{Алгоритм плат-\\\\ формы: $\\alpha_t = \\frac{1}{3}$}", "\\makecell{Алгоритм плат-\\\\ формы: PPO-D}"]
+plat_tex_short = ["$\\mathcal{K}_t \\equiv 0$", "$\\alpha_t = \\frac{1}{3}$", "PPO-D"]
 num = "2"
 GENERAL_RES = "TN_DDQN"
 files_amo = 6
@@ -33,14 +36,13 @@ files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
 files = [x.replace("_0", f"_{num}_0") for x in files]
 names = ["TN-DDQN", "PPO-D", "PPO-C", "SAC"]
 
-start_collusion = "\\bgroup\n\\def\\arraystretch{1.25}\n\\begin{table}[H]\n\t\\caption{Индексы сговора (по усред. последним 5\\% итераций)}\n\t\\label{tables:platforms_"
+start_collusion = "\\bgroup\n\\def\\arraystretch{1.25}\n\\begin{table}[H]\n\t\\caption{Индексы сговора по последним 5\\% итераций}\n\t\\label{tables:platforms_"
 start_collusion = start_collusion + pl_list[int(num)] + "}\n\t\\begin{center}\n\t\t\\vspace{-0.5em}\n\t\t\\begin{tabular}{c||ccc}\n\t\t\t\\toprule"
 
-# \caption{Расчетные статистики теста Колмогорова-Смирнова согласованности распределений параметров равновесия по 5\\% последних итераций}
-start_ks = "\\bgroup\n\\def\\arraystretch{1.25}\n\\begin{table}[H]\n\t\\caption{Расчетные статистики U-теста для распределений параметров равновесия по 5\\% последних итераций}\n\t\\label{tables:U_"
+start_ks = "\\bgroup\n\\def\\arraystretch{1.25}\n\\begin{table}[H]\n\t\\caption{Расчетные статистики U-теста для распределений параметров равновесия по последним 5\\% итераций}\n\t\\label{tables:U_"
 start_ks = start_ks + pl_list[int(num)] + "}\n\t\\begin{center}\n\t\t\\vspace{-0.5em}\n\t\t\\begin{tabular}{c||ccc}\n\t\t\t\\toprule"
+
 end_collusion = "\t\\end{center}\n\\end{table}\n\\egroup"
-plat_tex = ["\\makecell{Алгоритм плат-\\\\ формы: $\\mathcal{K}_t \\equiv 0$}", "\\makecell{Алгоритм плат-\\\\ формы: $\\alpha_t = \\frac{1}{3}$}", "\\makecell{Алгоритм плат-\\\\ формы: PPO-D}"]
 end_collusion = "\t\t\t\\bottomrule\n\t\t\\end{tabular}\n" + end_collusion
 
 if SPLASH:
@@ -244,7 +246,7 @@ if KS:
             dic[names[i]].append(text)
     
     df = pd.DataFrame(dic).T
-    # df.columns=["$KS_{price}$", "$KS_{inv}$", "$KS_{\pi}$"]
+    
     df.columns=["$U_{price}$", "$U_{inv}$", "$U_{\pi}$"]
     A = df.to_latex()
     A = "\n".join(["\t\t\t" + x for x in (plat_tex[int(num)] + "\n".join(A.split("\n")[2:-3])).split("\n")])
@@ -278,11 +280,40 @@ if CREATE:
     print(end_collusion)
     print("\n")
 
+    # y_lab = ["$\Delta_{price}$", "$\Delta_{inv}$", "$\Delta_{\pi}$"]
+    # sts = ["Mean", "Std", "Min", "Med", "Max", "KS"]
+
+    dic = {
+        (lab, x): []
+        for lab in names
+        for x in plat_tex_short
+    }
+
+    for i in range(4):
+        for j in range(3):
+            files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
+            files = [x.replace("_0", f"_{j}_0") for x in files]
+            x = files[i]
+            with open(f"./DRL_pricing/environment/simulation_results/{x}/summary.txt", "r+", encoding="utf-8") as f:
+                A = f.readlines()
+            mas = [dd.strip().replace("%", "\%").split(":")[1].strip() for dd in A[-3:]]
+            dic[(names[i], plat_tex_short[j])] = mas
+    df = pd.DataFrame(dic).T
+    df.columns=["$\Delta_{price}$", "$\Delta_{inv}$", "$\Delta_{\pi}$"]
+    A = df.to_latex()
+    A = "\n".join(["\t\t\t" + x for x in (plat_tex[int(num)] + "\n".join(A.split("\n")[2:-3])).split("\n")])
+
+    print(start_collusion)
+    print(A)
+    print(end_collusion)
+    print("\n")
+
+
     if DOWNLOAD_IN_TEX:
         dest = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))) + "/simulation_results/_tex_reports/"
         naming = "platforms_" + platform + ".tex"
         with open(dest + naming, "w+", encoding = "utf-8") as f:
-            f.write(start_ks + "\n" + A + "\n" + end_collusion)
+            f.write(start_collusion + "\n" + A + "\n" + end_collusion)
 
 
 if SHOW:
@@ -421,16 +452,20 @@ if SQUEEZE:
     gs = gridspec.GridSpec(4, len(files), height_ratios=[1, 1, 1, 0.02],
                            hspace=0.35, wspace=0.2)
     fig = plt.figure(figsize=(20, 12))
+    perc = 5
 
     for i in range(3):
         for j in range(len(files)):
             
             ax = fig.add_subplot(gs[i, j])
 
-            counts, bins = np.histogram(data[i][j])
-            counts = counts / len(data[i][j])
+            # counts, bins = np.histogram(data[i][j])
+            # counts = counts / len(data[i][j])
 
-            ax.hist(bins[:-1], bins, weights=counts, color = "#8B8B83") # , edgecolor='black'
+            # ax.hist(bins[:-1], bins, weights=counts, color = "#8B8B83") # , edgecolor='black'
+            ax = sns.histplot(data[i][j], kde=False, stat='probability', color = "#8B8B83", element = "step")
+            # sns.kdeplot(data[i][j], color='crimson', ax=ax)
+            ax.set(ylabel='')
 
             if i == 0:
                 ax.set_title(names[j], fontsize= 20)
@@ -439,26 +474,27 @@ if SQUEEZE:
             ax.axvline(x=th[i][0], color='blue', linestyle='--', linewidth=2, label = "NE")
 
             if i == 0 and j == 0:
-                ax.legend(fontsize=14, loc = "upper right")
+                ax.legend(fontsize=12, loc = "upper right")
             
             if j == 0:
                 ax.set_ylabel(y_lab[i], fontsize=16)
 
-            lower_bound = min(th[i][0], th[i][1])
-            upper_bound = max(th[i][0], th[i][1])
-            total_count = len(data[i][j])
-            within_interval = np.sum((data[i][j] >= lower_bound) & (data[i][j] <= upper_bound))
-            percentage_within = (within_interval / total_count) * 100
+            # lower_bound = min(th[i][0], th[i][1])
+            # upper_bound = max(th[i][0], th[i][1])
+            # total_count = len(data[i][j])
+            # within_interval = np.sum((data[i][j] >= lower_bound) & (data[i][j] <= upper_bound))
+            # percentage_within = (within_interval / total_count) * 100
 
-            ax.text(
-                0.5, -0.15, f"{percentage_within:.1f}%", 
-                transform=ax.transAxes, fontsize=18, ha='center', va='top',
-                bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'),
-                color= "red",
-            )
+            # ax.text(
+            #     0.5, -0.15, f"{percentage_within:.1f}%", 
+            #     transform=ax.transAxes, fontsize=18, ha='center', va='top',
+            #     bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'),
+            #     color= "red",
+            # )
 
-            mx = max(bins)
-            mn = min(bins)
+            mn = np.percentile(data[i][j], 0 + perc/2)
+            mx = np.percentile(data[i][j], 100 - perc/2)
+            ax.set_xlim((mn, mx))
 
             if i == 2:
                 ax.axvline(x=0, color='black', linestyle='--', linewidth=1)
@@ -481,10 +517,17 @@ if SQUEEZE:
                 
                 ax = fig.add_subplot(gs[i, j])
 
-                counts, bins = np.histogram(data[i][j])
-                counts = counts / len(data[i][j])
+                # counts, bins = np.histogram(data[i][j])
+                # counts = counts / len(data[i][j])
 
-                ax.hist(bins[:-1], bins, weights=counts, color = "#8B8B83") # , edgecolor='black'
+                # ax.hist(bins[:-1], bins, weights=counts, color = "#8B8B83") # , edgecolor='black'
+                ax = sns.histplot(data[i][j], kde=False, stat='probability', color = "#8B8B83", element = "step")
+                # sns.kdeplot(data[i][j], color='crimson', ax=ax)
+                ax.set(ylabel='')
+
+                mn = np.percentile(data[i][j], 0 + perc/2)
+                mx = np.percentile(data[i][j], 100 - perc/2)
+                ax.set_xlim((mn, mx))
 
                 if i == 0:
                     ax.set_title(names[j], fontsize= 20)
@@ -505,29 +548,20 @@ if PARI:
     data_naming = ["цен", "инвестиций в запасы", "прибылей"]
     data_labeling = ["p", "y", "pi"]
 
-    if DIFF_PL:
-        Platform_actions = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Platform_actions.npy") for x in files]
-        Platform_history = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Platform_history.npy") for x in files]
-        data = data + [Platform_actions, Platform_history]
-        data_naming = data_naming + ["коэфф. бустинга", "прибыли платформы"]
-        data_labeling = data_labeling + ["alpha", "pi_plat"]
+    start_ks_pari = "\\bgroup\n\def\\arraystretch{1.25}\n\\begin{table}[H]\n\t\caption{Расчетные статистики U-теста для распределений "
+    start_ks_pari = start_ks_pari + ", ".join(data_naming) + " в равновесии по последним 5\\% итераций}\n\t\label{tables:ks_"
+    start_ks_pari = start_ks_pari + pl_list[int(num)] + ":" + "_".join(data_labeling)
+    start_ks_pari = start_ks_pari + "}\n\t\\begin{center}\n\t\t\\vspace{-0.5em}\n\t\t\\begin{tabular}{c||cccc}\n\t\t\t\\toprule"
 
-    for idx in range(len(data)):
-        mas = data[idx]
-        dic = {names[i]:[] for i in range(len(files) - 1)}
-
-        start_ks_pari = "\\bgroup\n\def\arraystretch{1.25}\n\\begin{table}[H]\n\t\caption{Расчетные статистики U-теста для распределений "
-        start_ks_pari = start_ks_pari + data_naming[idx] + " в равновесии по 5\\% последних итераций}\n\t\label{tables:ks_"
-        start_ks_pari = start_ks_pari + pl_list[int(num)] + ":" + data_labeling[idx]
-        start_ks_pari = start_ks_pari + "}\n\t\\begin{center}\n\t\t\\vspace{-0.5em}\n\t\t\\begin{tabular}{c||cccc}\n\t\t\t\\toprule"
-
-        for i in range(len(files) - 1):
-            for j in range(len(files)):
-                if j < i + 1:
-                    text = " "
-                    dic[names[i]].append(text)
-                    continue
-                # a = stats.ks_2samp(data_new[i][j].flatten(), data_old[i][j].flatten())
+    dic = {names[i]:[] for i in range(len(files) - 1)}
+    for i in range(len(files) - 1):
+        for j in range(len(files)):
+            text = "\makecell[c]{ "
+            for idx in range(len(data)):
+                if j <= i:
+                    text = text + "\\\\[1ex] }"
+                    break
+                mas = data[idx]
                 b = stats.mannwhitneyu(mas[i].flatten(), mas[j].flatten(), alternative='less')
                 c = stats.mannwhitneyu(mas[i].flatten(), mas[j].flatten(), alternative="greater")
                 d = stats.mannwhitneyu(mas[i].flatten(), mas[j].flatten(), alternative="two-sided")
@@ -545,16 +579,80 @@ if PARI:
                 #     res1 = stats.ecdf(mas[i].flatten())
                 #     res2 = stats.ecdf(mas[j].flatten())
                 #     ax = plt.subplot()
-                #     res1.cdf.plot(ax, color = "blue")
-                #     res2.cdf.plot(ax, color = "orange")
+                #     res1.cdf.plot(ax, color = "blue", label = names[i])
+                #     res2.cdf.plot(ax, color = "orange", label = names[j])
+                #     plt.legend()
                 #     plt.show()
                 dots = "*" * int(a.pvalue < 0.1)  + "*" * int(a.pvalue < 0.05)  + "*" * int(a.pvalue < 0.01)
-                text = "$"* int(len(dots) > 0) + str(round(a.statistic, 2)) + ("^{" + dots + "}") * int(len(dots) > 0)
-                text = "\makecell[c]{ " + text + ("_{" + sign + "} $") * int(len(dots) > 0) +"\\\\[1ex] }" # + (" \\\\ (" + sign + ") ") * int(len(dots) > 0)
+                new_text = "$"* int(len(dots) > 0) + str(round(a.statistic, 2)) + ("^{" + dots + "}") * int(len(dots) > 0)
+                text = text + new_text + ("_{" + sign + "} $") * int(len(dots) > 0) +"\\\\" + "[1ex] }" * int(idx == len(data) - 1)
+            
+            dic[names[i]].append(text)
+    
+    df = pd.DataFrame(dic).T
+    df.columns=names
+    print(start_ks_pari)
+    A = df.to_latex()
+    A = "\n".join(["\t\t\t" + x for x in (plat_tex[int(num)] + "\n".join(A.split("\n")[2:-3])).split("\n")])
+    print(A)
+    print(end_collusion)
+    print("\n")
+
+    if DOWNLOAD_IN_TEX:
+        dest = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))) + "/simulation_results/_tex_reports/"
+        naming = "inner_platforms_" + platform + ".tex"
+        with open(dest + naming, "w+", encoding = "utf-8") as f:
+            f.write(start_ks_pari + "\n" + A + "\n" + end_collusion)
+
+    if DIFF_PL:
+        Platform_actions = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Platform_actions.npy") for x in files]
+        Platform_history = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Platform_history.npy") for x in files]
+        data = [Platform_actions, Platform_history]
+        data_naming = ["коэфф. бустинга", "прибыли платформы"]
+        data_labeling = ["alpha", "pi_plat"]
+
+        start_ks_pari = "\\bgroup\n\def\\arraystretch{1.25}\n\\begin{table}[H]\n\t\caption{Расчетные статистики U-теста для распределений "
+        start_ks_pari = start_ks_pari + ", ".join(data_naming) + " в равновесии по последним 5\\% итераций}\n\t\label{tables:ks_"
+        start_ks_pari = start_ks_pari + pl_list[int(num)] + ":" + "_".join(data_labeling)
+        start_ks_pari = start_ks_pari + "}\n\t\\begin{center}\n\t\t\\vspace{-0.5em}\n\t\t\\begin{tabular}{c||cccc}\n\t\t\t\\toprule"
+
+        dic = {names[i]:[] for i in range(len(files) - 1)}
+        for i in range(len(files) - 1):
+            for j in range(len(files)):
+                text = "\makecell[c]{ "
+                for idx in range(len(data)):
+                    if j <= i:
+                        text = text + "\\\\[1ex] }"
+                        break
+                    mas = data[idx]
+                    b = stats.mannwhitneyu(mas[i].flatten(), mas[j].flatten(), alternative='less')
+                    c = stats.mannwhitneyu(mas[i].flatten(), mas[j].flatten(), alternative="greater")
+                    d = stats.mannwhitneyu(mas[i].flatten(), mas[j].flatten(), alternative="two-sided")
+                    if (d.pvalue < 0.1) and (b.pvalue < c.pvalue):
+                        a = b
+                        sign = "<"
+                    elif (d.pvalue < 0.1) and (b.pvalue > c.pvalue):
+                        a = c
+                        sign = ">"
+                    elif (d.pvalue >= 0.1):
+                        a = d
+                        sign = "0"
+                    # if i in [0] and j in [3]:
+                    #     print(b.pvalue, c.pvalue, d.pvalue)
+                    #     res1 = stats.ecdf(mas[i].flatten())
+                    #     res2 = stats.ecdf(mas[j].flatten())
+                    #     ax = plt.subplot()
+                    #     res1.cdf.plot(ax, color = "blue", label = names[i])
+                    #     res2.cdf.plot(ax, color = "orange", label = names[j])
+                    #     plt.legend()
+                    #     plt.show()
+                    dots = "*" * int(a.pvalue < 0.1)  + "*" * int(a.pvalue < 0.05)  + "*" * int(a.pvalue < 0.01)
+                    new_text = "$"* int(len(dots) > 0) + str(round(a.statistic, 2)) + ("^{" + dots + "}") * int(len(dots) > 0)
+                    text = text + new_text + ("_{" + sign + "} $") * int(len(dots) > 0) +"\\\\" + "[1ex] }" * int(idx == len(data) - 1)
+                
                 dic[names[i]].append(text)
         
         df = pd.DataFrame(dic).T
-        # df.columns=["$KS_{price}$", "$KS_{inv}$", "$KS_{\pi}$"]
         df.columns=names
         print(start_ks_pari)
         A = df.to_latex()
@@ -563,19 +661,93 @@ if PARI:
         print(end_collusion)
         print("\n")
 
-        # print(start_collusion)
-        # print(A)
-        # print(end_collusion)
-        # print("\n")
-
-        # if DOWNLOAD_IN_TEX:
-        #     dest = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))) + "/simulation_results/_tex_reports/"
-        #     naming = "platforms_" + platform + ".tex"
-        #     with open(dest + naming, "w+", encoding = "utf-8") as f:
-        #         f.write(start_ks + "\n" + A + "\n" + end_collusion)
+        if DOWNLOAD_IN_TEX:
+            dest = str(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))) + "/simulation_results/_tex_reports/"
+            naming = "inner_platforms_" + platform + "_PL.tex"
+            with open(dest + naming, "w+", encoding = "utf-8") as f:
+                f.write(start_ks_pari + "\n" + A + "\n" + end_collusion)
 
 
 if SIBLINGS:
+    Price_list = []
+    Profit_list = []
+    Stock_list = []
+    for k_num in range(3):
+        files = ["TN_DDQN_0", "PPO_D_0", "PPO_C_0", "SAC_0"]
+        files = [x.replace("_0", f"_{k_num}_0") for x in files]
+        Price_list = Price_list + [[np.load(f"./DRL_pricing/environment/simulation_results/{x}/Price_history.npy").flatten() for x in files]]
+        Profit_list = Profit_list + [[np.load(f"./DRL_pricing/environment/simulation_results/{x}/Profit_history.npy").flatten() for x in files]]
+        Stock_list = Stock_list + [[np.load(f"./DRL_pricing/environment/simulation_results/{x}/Stock_history.npy").flatten() for x in files]]
+    # if DIFF_PL:
+    #     Platform_history = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Platform_history.npy").flatten() for x in files]
+    #     Platform_actions = [np.load(f"./DRL_pricing/environment/simulation_results/{x}/Platform_actions.npy").flatten() for x in files]
     
-    pass
+    Price_list = np.array(Price_list).transpose(1, 0, 2)
+    Profit_list = np.array(Profit_list).transpose(1, 0, 2)
+    Stock_list = np.array(Stock_list).transpose(1, 0, 2)
+    data = [Price_list, Stock_list, Profit_list]
+
+    # demand_params = Environment["demand_params"]
+    # spros = demand_function(**demand_params)
+    # gamma = Environment["gamma"]
+    # theta_d = Environment["theta_d"]
+    # p_NE, p_M, pi_NE, pi_M = spros.get_theory(Environment["c_i"], gamma, theta_d)
+    # inv_NE, inv_M = spros.distribution([p_NE]*Environment["n"])[0], spros.distribution([p_M]*Environment["n"])[0]
+
+    extr = [(Environment["p_inf"], Environment["p_sup"]), (0, Environment["demand_params"]["C"]), (-5, 15)]
+    y_lab = ["Цены", "Запасы", "Прибыль"]
+    sts = ["Mean", "Std", "Min", "Med", "Max", "KS"] # , "Mode"
+
+    perc = 0.5/100 * 400
+    for param in range(3):
+        AA = data[param]
+        cols = {
+            (lab, x): []
+            for lab in [y_lab[param]] # y_lab
+            for x in sts
+        }
+        dd = {
+            (names[algo], plat_tex_short[env]): []
+            for algo in range(len(files))
+            for env in range(3)
+        }
+        for algo in range(len(files)):
+            BB = AA[algo]
+            for env in range(3):
+                unfilter_mas = BB[env]
+                mas = sorted(unfilter_mas)[int(perc/2):-int(perc/2)]
+                res = [np.mean(mas), np.std(mas, ddof = 1), np.min(mas), np.percentile(mas, 50), np.max(mas)]
+                # res = ["$" + str(np.round(x, 2))[:4] + "$" for x in res]
+                # INT = np.linspace(extr[param][0], extr[param][1], 10**4)
+                # kde = stats.gaussian_kde(mas).evaluate(INT)
+                # res.append(INT[np.argmax(kde)])
+                
+                dd[(names[algo], plat_tex_short[env])] = dd[(names[algo], plat_tex_short[env])] + res
+                
+                # if i == 1 and j == 1:
+                #     INT = np.linspace(np.min(data[i][j]), np.max(data[i][j]), 10**3)
+                #     mas = stats.ecdf(data[i][j]).cdf
+                #     plt.plot(mas.quantiles, mas.probabilities, color = "blue", label = "US")
+                #     mas = stats.norm.cdf(INT, loc = np.mean(data[i][j]), scale = np.std(data[i][j]))
+                #     plt.plot(INT, mas, color = "red", label = "NORM")
+                #     plt.title(names[j])
+                #     plt.legend()
+                #     plt.show()
+
+                norm_stat = stats.kstest(mas, cdf = "norm", args = (np.mean(mas), np.std(mas, ddof=1)))
+                # print(norm_stat.pvalue)
+                txt = "{:0.1e}".format(norm_stat.pvalue)
+                if txt == "1.0e+00":
+                    txt = "$1 \\cdot 10^{0}$"
+                else:
+                    txt = "$" + "\mathbf{" * int(norm_stat.pvalue < 0.05) + txt[:txt.find("e")] + "\\cdot 10^{-" + str(int(txt[txt.find("-") + 1:])) + "}" + "}" * int(norm_stat.pvalue < 0.05) + "$"
+                dd[(names[algo], plat_tex_short[env])].append(txt)
+    
+        df = pd.DataFrame(dd).T
+        df.columns=cols
+        prnt = df.to_latex(float_format="{:.2f}".format)
+        prnt = prnt.replace("\\multicolumn{" + str(len(sts)) + "}{r}", "\\multicolumn{" + str(len(sts)) + "}{c}")
+        prnt = prnt.replace("l"*(2 + len(sts)), "ll" + "c"*len(sts))
+        print(prnt)
+        print("\n")
 

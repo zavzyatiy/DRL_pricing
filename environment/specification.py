@@ -299,3 +299,7 @@ e5 = {
 Environment = e1 | e2 | e3 | e4 | e5
 
 # print(Environment)
+
+# a = np.load(r"DRL_pricing\environment\simulation_results\PPO_D_2_0\Profit_history.npy")
+# for b in [["{:.2f}".format(x[0]), "{: .2f}".format(x[1])] for x in a.tolist()]:
+#     print(b)
